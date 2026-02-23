@@ -21,3 +21,4 @@ pub mod sandbox;
 pub mod types;
 pub mod watcher;
 pub mod wormhole;
+pub mod permissions;
