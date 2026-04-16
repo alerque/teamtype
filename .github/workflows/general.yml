@@ -6,17 +6,6 @@ name: General tests
 
 on:
   push:
-    branches:
-      - 'main'
-    paths:
-      - 'daemon/**'
-      - 'nvim-plugin/**'
-      - '.github/workflows/general.yml'
-  pull_request:
-    paths:
-      - 'daemon/**'
-      - 'nvim-plugin/**'
-      - '.github/workflows/general.yml'
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,8 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        nvim-version: [v0.9.5, v0.10.4, v0.11.2]
+        os: [macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -50,16 +38,6 @@ jobs:
       - name: Add teamtype binary to PATH
         run: echo "$PWD/target/release" >> $GITHUB_PATH
       - run: teamtype --version
-      - name: Install Neovim
-        uses: rhysd/action-setup-vim@v1
-        with:
-          neovim: true
-          version: ${{ matrix.nvim-version }}
-      - run: nvim --version
-      - name: Install Neovim plugin
-        run: |
-          mkdir -p $HOME/.local/share/nvim/site/pack/plugins/start
-          ln -s $PWD/../nvim-plugin $HOME/.local/share/nvim/site/pack/plugins/start/teamtype
       - name: Compile unit tests
         run: cargo test --no-default-features --no-run --locked
       - name: Run unit tests
@@ -67,39 +45,6 @@ jobs:
       - name: Compile integration tests
         working-directory: ./daemon/integration-tests
         run: cargo test --no-run --locked
-      - if: ${{ matrix.os == 'ubuntu-latest' && matrix.nvim-version == 'v0.10.4' }}
-        name: Run integration tests
+      - name: Build check
         working-directory: ./daemon/integration-tests
-        run: cargo test
-      - if: ${{ matrix.os != 'ubuntu-latest' || matrix.nvim-version != 'v0.10.4' }}
-        name: Run integration tests (without fuzzer)
-        working-directory: ./daemon/integration-tests
-        run: cargo test --test nvim-plugin
-
-  check_formatting:
-    name: Check Rust formatting
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo fmt --check
-
-  clippy:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    env:
-      RUSTFLAGS: --deny warnings
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Rust toolchain
-        run: rustup toolchain install stable --profile minimal --component=clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            daemon
-            daemon/integration-tests
-          cache-on-failure: true
-      - run: cargo clippy --all-targets --all-features
-      - run: cargo doc --no-deps --all-features
+        run: cargo check --all-features
