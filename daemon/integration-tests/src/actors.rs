@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2024 blinry <mail@blinry.org>
 // SPDX-FileCopyrightText: 2024 zormit <nt4u@kpvn.de>
+// SPDX-FileCopyrightText: 2026 Caleb Maclennan <caleb@alerque.com>
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -10,7 +11,7 @@ use teamtype::{document, sandbox};
 
 use async_trait::async_trait;
 pub use nvim_rs::{compat::tokio::Compat, create::tokio::new_child_cmd, rpc::handler::Dummy};
-use rand::Rng;
+use rand::RngExt;
 use tempfile::{TempDir, tempdir};
 use tokio::process::ChildStdin;
 

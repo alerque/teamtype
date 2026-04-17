@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2024 blinry <mail@blinry.org>
 // SPDX-FileCopyrightText: 2024 zormit <nt4u@kpvn.de>
+// SPDX-FileCopyrightText: 2026 Caleb Maclennan <caleb@alerque.com>
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -13,7 +14,7 @@ use teamtype::sandbox;
 use anyhow::Result;
 use futures::future::join_all;
 use pretty_assertions::assert_eq;
-use rand::Rng;
+use rand::RngExt;
 use tempfile::{TempDir, tempdir};
 use tokio::time::{Duration, sleep, timeout};
 use tracing::{error, info};
@@ -25,7 +26,7 @@ async fn perform_random_edits(actor: &mut (impl Actor + ?Sized)) {
     for _ in 1..500 {
         actor.apply_random_delta().await;
 
-        let random_millis = rand::thread_rng().gen_range(10..20);
+        let random_millis = rand::rng().random_range(10..20);
         sleep(Duration::from_millis(random_millis)).await;
     }
 }
