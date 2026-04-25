@@ -10,7 +10,8 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use anyhow::{Context, Result, bail};
+use anyhow::bail;
+use anyhow::{Context, Result};
 use futures::StreamExt;
 use tokio::{
     io::WriteHalf,
@@ -104,7 +105,7 @@ pub fn spawn_socket_listener(
 ) -> Result<()> {
     // Make sure the parent directory of the socket is only accessible by the current user.
     if let Err(description) = is_user_readable_only(socket_path) {
-        panic!("{}", description);
+        bail!("{description}");
     }
 
     // Using the sandbox method here is technically unnecessary,
