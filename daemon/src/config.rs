@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2025 blinry <mail@blinry.org>
 // SPDX-FileCopyrightText: 2025 zormit <nt4u@kpvn.de>
 // SPDX-FileCopyrightText: 2026 axelmartensson <axel.martensson@hotmail.com>
+// SPDX-FileCopyrightText: 2026 Caleb Maclennan <caleb@alerque.com>
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -8,7 +9,8 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::bail;
+use anyhow::{Context, Result};
 use git2::ConfigLevel;
 use ini::{Ini, Properties};
 use tracing::info;

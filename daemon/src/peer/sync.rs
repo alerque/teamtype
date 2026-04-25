@@ -6,6 +6,7 @@
 
 use std::mem;
 
+use anyhow::bail;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use automerge::sync::{Message, State};
@@ -116,7 +117,7 @@ impl SyncActor {
                     match doc_ping {
                         Ok(()) => { self.generate_sync_message().await?; }
                         Err(RecvError::Closed) => {
-                            panic!("Doc changed channel has been closed");
+                            bail!("Doc changed channel has been closed");
                         }
                         Err(RecvError::Lagged(_)) => {
                             // This is fine, the messages in this channel are just pings.
