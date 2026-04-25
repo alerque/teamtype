@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use serde_json::Value as JSONValue;
+use serde_json::Value;
 use teamtype::sandbox;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter, split},
@@ -77,7 +77,7 @@ impl MockSocket {
             .expect("Could not send message");
     }
 
-    pub async fn recv(&mut self) -> JSONValue {
+    pub async fn recv(&mut self) -> Value {
         let line = self
             .reader_rx
             .recv()
@@ -86,7 +86,7 @@ impl MockSocket {
         serde_json::from_str(&line).expect("Could not parse JSON")
     }
 
-    pub async fn acknowledge_open(&mut self) -> JSONValue {
+    pub async fn acknowledge_open(&mut self) -> Value {
         let json = self.recv().await;
         if json.get("method").unwrap() == "open" {
             let id = json.get("id").unwrap();

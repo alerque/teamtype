@@ -7,7 +7,7 @@ use std::mem;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use automerge::sync::{Message as AutomergeSyncMessage, State as SyncState};
+use automerge::sync::{Message, State};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, oneshot};
 use tracing::debug;
@@ -35,7 +35,7 @@ pub trait Connection<T>: Send + Sync {
 /// Exchanges [`PeerMessage`]s with the connection, and communicates with the document on the other side.
 /// Maintains the sync state.
 pub struct SyncActor {
-    peer_state: SyncState,
+    peer_state: State,
     document_handle: DocumentActorHandle,
     connection: Box<dyn Connection<PeerMessage>>,
 }
@@ -46,7 +46,7 @@ impl SyncActor {
         connection: Box<dyn Connection<PeerMessage>>,
     ) -> Self {
         Self {
-            peer_state: SyncState::new(),
+            peer_state: State::new(),
             document_handle,
             connection,
         }
@@ -56,7 +56,7 @@ impl SyncActor {
         let (reponse_tx, response_rx) = oneshot::channel();
         match message {
             PeerMessage::Sync(message_buf) => {
-                let message = AutomergeSyncMessage::decode(&message_buf)?;
+                let message = Message::decode(&message_buf)?;
                 self.document_handle
                     .send_message(DocMessage::ReceiveSyncMessage {
                         message,
