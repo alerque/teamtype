@@ -5,8 +5,9 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use std::env;
 use std::path::{Path, PathBuf};
+use std::process::exit;
+use std::{env, panic};
 
 use anyhow::{Context, Result, bail};
 use clap::{CommandFactory as _, FromArgMatches as _};
@@ -43,10 +44,10 @@ fn has_teamtype_directory(dir: &Path) -> bool {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let default_panic = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
+    let default_panic = panic::take_hook();
+    panic::set_hook(Box::new(move |info| {
         default_panic(info);
-        std::process::exit(1);
+        exit(1);
     }));
 
     let arg_matches = Cli::command().get_matches();
