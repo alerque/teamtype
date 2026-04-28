@@ -6,8 +6,8 @@ name: General tests
 
 on:
   push:
-    branches:
-      - 'main'
+    # branches:
+    #   - 'main'
     paths:
       - 'daemon/**'
       - 'nvim-plugin/**'

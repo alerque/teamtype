@@ -7,8 +7,8 @@
 name: Deploy mdBook
 on:
   push:
-    branches:
-      - 'main'
+    # branches:
+    #   - 'main'
     paths:
       - 'book/**'
       - '.github/workflows/mdbook.yml'
