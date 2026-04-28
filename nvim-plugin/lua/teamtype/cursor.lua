@@ -1,6 +1,7 @@
 -- SPDX-FileCopyrightText: 2024 blinry <mail@blinry.org>
 -- SPDX-FileCopyrightText: 2024 zormit <nt4u@kpvn.de>
 -- SPDX-FileCopyrightText: 2025 mbitard <code@bitard.fr>
+-- SPDX-FileCopyrightText: 2026 Caleb Maclennan <caleb@alerque.com>
 --
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -51,12 +52,7 @@ local function jump_to_user_id(user_id)
             targetRange = cursor.range,
             targetSelectionRange = cursor.range,
         }
-        -- In Neovim 0.11, jump_to_location was deprecated.
-        if vim.version().api_level < 13 then
-            vim.lsp.util.jump_to_location(location, offset_encoding, true)
-        else
-            vim.lsp.util.show_document(location, offset_encoding)
-        end
+        vim.lsp.util.show_document(location, offset_encoding)
     end
 end
 

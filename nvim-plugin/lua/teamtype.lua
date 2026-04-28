@@ -39,6 +39,10 @@ function M.config(name, cfg)
 end
 
 function M.enable(name, enable)
+    -- Neovim 0.10 is API level 13
+    if vim.version().api_level < 13 then
+        error("Neovim 0.11.0 or newer is required for the Teamtype plugin")
+    end
     if enable == nil then
         enable = true
     end

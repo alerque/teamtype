@@ -1,5 +1,6 @@
 -- SPDX-FileCopyrightText: 2025 blinry <mail@blinry.org>
 -- SPDX-FileCopyrightText: 2025 zormit <nt4u@kpvn.de>
+-- SPDX-FileCopyrightText: 2026 Caleb Maclennan <caleb@alerque.com>
 --
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -7,25 +8,7 @@ local M = {}
 
 -- Recusively scan up directories. If we find a .teamtype directory on any level, return its parent, and nil otherwise.
 function M.find_directory(filename, marker)
-    if vim.version().api_level < 12 then
-        -- In Neovim 0.9, do it manually.
-        local path = filename
-        while true do
-            if vim.fn.isdirectory(path .. "/" .. marker) == 1 then
-                return path
-            end
-            local parentPath = vim.fn.fnamemodify(path, ":h")
-            if parentPath == path then
-                -- We can't progress further like this.
-                return nil
-            else
-                path = parentPath
-            end
-        end
-    else
-        -- In Neovim 0.10, this function is available.
-        return vim.fs.root(filename, marker)
-    end
+    return vim.fs.root(filename, marker)
 end
 
 return M

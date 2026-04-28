@@ -73,18 +73,7 @@ function M.connect(cmd, directory, on_notification)
     local connection
     local extra_spawn_params = { cwd = directory }
 
-    if vim.version().api_level < 12 then
-        -- In Neovim 0.9, the API was to pass the command and its parameters as two arguments.
-        local params = {}
-        for i = 2, #cmd do
-            table.insert(params, cmd[i])
-        end
-        ---@diagnostic disable-next-line: redundant-parameter
-        connection = vim.lsp.rpc.start(executable, params, dispatchers, extra_spawn_params)
-    else
-        -- While in Neovim 0.10, it is combined into one table.
-        connection = vim.lsp.rpc.start(cmd, dispatchers, extra_spawn_params)
-    end
+    connection = vim.lsp.rpc.start(cmd, dispatchers, extra_spawn_params)
 
     print("Connected to Teamtype daemon!")
 
