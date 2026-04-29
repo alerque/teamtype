@@ -12,10 +12,10 @@ It is possible to tightly integrate Teamtype and Git by setting the `--sync-vcs`
 Setting it causes Teamtype to *not* [ignore](ignored-files.md) version-control directories when synchronizing files.
 This might seem like an unusual approach to working with Git, but in our tests, when pairing, it seems to work more or less smoothly.
 
-Beware that this is quite **EXPERIMENTAL** and be prepared to potentially loose your data (especially when learning to "think" in this potentially unfamiliar scheme).
+Beware that this is quite **EXPERIMENTAL** and be prepared to potentially loose your data (especially when learning to “think” in this potentially unfamiliar scheme).
 Note that all peers should use the `--sync-vcs` flag.
 
-We'll describe this method from the perspective of Git, but it might/should work for other version-control systems as well.
+We’ll describe this method from the perspective of Git, but it might/should work for other version-control systems as well.
 
 ## Why would you want this?
 
@@ -27,15 +27,15 @@ The effect is surprising:
 
 - When one peer creates a commit, it will immediately be visible for the other peers.
 - When one peer changes the branch, it will now also be checked out for the other peers.
-- Git's index will have the same state for all peers.
+- Git’s index will have the same state for all peers.
 
-This allows a very "smooth" collaboration, where you don't need to pull or push explicitly.
+This allows a very “smooth” collaboration, where you don’t need to pull or push explicitly.
 
 ## Committing together
 
 When one of the participants initiates `git commit`, Git will, depending on your setup, open an editor where you can write the commit message.
 The temporary file for this is `.git/COMMIT_EDITMSG`, which is now synced, so any peer can open it as well and you can edit it together.
-The initiator of the commit has the "power" to finalize the commit by closing the file, their Git will create the commit.
+The initiator of the commit has the “power” to finalize the commit by closing the file, their Git will create the commit.
 
 ## Recommendation: Use a separate directory to try this
 

@@ -16,22 +16,22 @@ Teamtype consists of two parts: The daemon and editor plugins.
 
 The daemon takes care of synchronization with other peers.
 An editor, on the other hand, has to communicate with the daemon to send it changes made to the file by the user, as well as changes of cursor positions.
-The daemon will send other people's changes and cursor positions back to the editor.
+The daemon will send other people’s changes and cursor positions back to the editor.
 
-To make this as easy as possible for your plugin, we're using the same protocol as the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/overviews/lsp/overview/): [JSON-RPC](https://www.jsonrpc.org/specification).
-So if your editor plugin system allows connecting to an LSP, you'll hopefully can re-use the component opening a JSON-RPC connection.
+To make this as easy as possible for your plugin, we’re using the same protocol as the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/overviews/lsp/overview/): [JSON-RPC](https://www.jsonrpc.org/specification).
+So if your editor plugin system allows connecting to an LSP, you’ll hopefully can re-use the component opening a JSON-RPC connection.
 
 The editor plugin will need to spawn the command `teamtype client` (which is our helper tool to connect to a running Teamtype daemon), and speak JSON-RPC (with Content-Length headers) with the standard input/output of that process.
-Think of `teamtype client` as the LSP Server when looking at it from the editor's perspective.
+Think of `teamtype client` as the LSP Server when looking at it from the editor’s perspective.
 
 ## File ownership
 
 Teamtype has the concept of file ownership.
 By default, the daemon has ownership, which means that, as external tools make changes to files, the daemon will pick up those changes.
 
-But when an editor sends an "open" message, it takes ownership; changes by external tools will be ignored.
+But when an editor sends an “open” message, it takes ownership; changes by external tools will be ignored.
 
-When the last editor gives up ownership by sending a "close" message, the daemon takes ownership again.
+When the last editor gives up ownership by sending a “close” message, the daemon takes ownership again.
 
 ## Editor revision and daemon revision
 
@@ -49,11 +49,11 @@ The editor must only send messages for files inside Teamtype-enabled directories
 
 ## The daemon-editor protocol
 
-Here's the nitty-gritty details of what messages the daemon and the editor use to talk to each other.
+Here’s the nitty-gritty details of what messages the daemon and the editor use to talk to each other.
 
 ### Basic data types
 
-The protocol uses a couple of basic data types (we're using the same syntax to specify them as the [LSP specification](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/):
+The protocol uses a couple of basic data types (we’re using the same syntax to specify them as the [LSP specification](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/):
 
 - `DocumentUri = string`
 
@@ -71,7 +71,7 @@ The protocol uses a couple of basic data types (we're using the same syntax to s
 
 - `Delta: {range: Range, replacement: string}[]`
 
-  A complex text manipulation, similar to LSP's [`TextEdit[]`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textEditArray).
+  A complex text manipulation, similar to LSP’s [`TextEdit[]`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textEditArray).
   Like in LSP, **all ranges refer to the starting content**, and must never overlap, see the linked LSP documentation.
 
 ### Messages sent by the editor to the daemon
@@ -81,9 +81,9 @@ These should be sent as JSON-RPC requests, so that the daemon can send back erro
 #### `"open" {uri: DocumentUri, content: String}`
 
 - Sent when the editor opens a document.
-  The daemon will respond either with a success, or with an error describing why the file could not be opened (for example, because it is an ignored file, or if it's not part of the daemons shared project).
+  The daemon will respond either with a success, or with an error describing why the file could not be opened (for example, because it is an ignored file, or if it’s not part of the daemons shared project).
 - When an open succeeds, the editor gets ownership of the file, and the daemon will start sending updates for it as they come in.
-- The `content` parameter should be the editor's buffer content.
+- The `content` parameter should be the editor’s buffer content.
   If that content diverges from what the daemon thinks the content should be, it will send edits back.
 - The editor has to initialize its editor revision and daemon revision for that document to 0.
 
@@ -119,7 +119,7 @@ These should be sent as notifications, there is no need to reply to them.
 
 #### `"cursor" {userid: string, name?: string, uri: DocumentUri, ranges: Range[]}`
 
-- The daemon sends this message when user's cursor positions or selections change, regardless of whether the file has been opened in the editor.
+- The daemon sends this message when user’s cursor positions or selections change, regardless of whether the file has been opened in the editor.
   The editor can use this information to display in which files other people work.
 
 ## Tools to help you develop and debug a new plugin
@@ -137,8 +137,8 @@ You can then start the client, in another terminal, but in the same directory:
 teamtype client
 ```
 This will already produce an output in the daemon which indicates that an Editor connected.
-This happens because the client connects to the daemon's socket.
-Killing it shows the opposite: "Editor disconnected".
+This happens because the client connects to the daemon’s socket.
+Killing it shows the opposite: “Editor disconnected”.
 
 Next, you could manually send some JSON-RPC.
 We included a Python script to help you create messages in the correct format: Run it to see what an open message could look like:
@@ -155,7 +155,7 @@ python tools/dummy-jsonrpc.py playground/file | teamtype client
 
 ### Seeing what an existing Teamtype plugin sends
 
-On the other hand, not running any daemon, you can see what the plugin "wants" to communicate as follows.
+On the other hand, not running any daemon, you can see what the plugin “wants” to communicate as follows.
 In the demon console (stop it), we now just plainly listen on the socket for incoming data:
 ```bash
 # nc can only bind to existing sockets, so we'll drop potentially existing ones
@@ -173,7 +173,7 @@ For testing purposes, it can be useful to simulate having two peers connecting t
 
 Do do that on a single machine, follow these steps:
 
-1. Start one daemon regularly, we will call its directory the "first directory".
+1. Start one daemon regularly, we will call its directory the “first directory”.
 2. Create a new, empty directory for the second daemon.
 3. Start the second daemon:
     - The directory should be the additional directory you created.
