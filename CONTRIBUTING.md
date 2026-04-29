@@ -7,13 +7,13 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # Contributing
 
-We're happy you want to contribute to Teamtype!
+We’re happy you want to contribute to Teamtype!
 
-Note: This document is in draft form and it's bringing up a few points that are important to us, but isn't expected to be complete yet.
+Note: This document is in draft form and it’s bringing up a few points that are important to us, but isn’t expected to be complete yet.
 
 ## Compiling the daemon from source
 
-You will need Rust's `cargo` tool.
+You will need Rust’s `cargo` tool.
 
 1. Clone this repository.
 2. Navigate to the `daemon/` subdirectory and run
@@ -22,13 +22,13 @@ You will need Rust's `cargo` tool.
     cargo build --locked --release
     ```
 
-3. This will create a binary called `target/release/teamtype`, that needs to be added/moved to your shell's `$PATH`.
+3. This will create a binary called `target/release/teamtype`, that needs to be added/moved to your shell’s `$PATH`.
 
 ## REUSE policy
 
 We are following the [REUSE](https://reuse.software) standard for licensing our codebase.
 
-If you have made "significant" contributions (up to your and our [discretion](https://reuse.software/faq/#when-copyright)), we would ask you to add yourself to the REUSE header of the changed files.
+If you have made “significant” contributions (up to your and our [discretion](https://reuse.software/faq/#when-copyright)), we would ask you to add yourself to the REUSE header of the changed files.
 
 We will do this until the number of contributors grow too large and then switch to a [new format](https://reuse.software/faq/#many-copyright-statements).
 

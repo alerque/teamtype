@@ -13,19 +13,19 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 For complete end-user documentation see the [Teamtype Documentation][docs] site.
 
 > [!NOTE]
-> Until October 2025, this project was known as "Ethersync".
+> Until October 2025, this project was known as “Ethersync”.
 > The motivation for the rename was explained in [this PR][formerly].
 
 Teamtype enables real-time peer-to-peer collaborative editing of local files using your own text editor or other tools.
 For example, you can use it for pair programming sessions, brainstorming, or note-taking.
-It's the missing real-time complement Git and other snapshot based version control systems!
+It’s the missing real-time complement Git and other snapshot based version control systems!
 
 ![Demo video for how to make a connection and of collaborating in Neovim][demo-video]
 
 ## Features
 
 - 👥 Edit files concurrently by multiple users using different text editors
-- 📍 See your peers' cursors, selections, and edits in real time
+- 📍 See your peers’ cursors, selections, and edits in real time
 - 🗃️ Collaborate on entire directories, not just single files
 - 🔒 Rest easy with encrypted peer-to-peer connections, no need for a server
 - ✒️ Maintain full access with a local-first model that retains all content on disk even if you go offline
@@ -44,8 +44,8 @@ We are just a bunch of people building something we want to use ourselves.
 
 ## 🚦 Project status
 
-We're currently maintaining Teamtype in our free time.
-We're often using it for pair programming ourselves, but there's still some [bugs][bugs] to be aware of.
+We’re currently maintaining Teamtype in our free time.
+We’re often using it for pair programming ourselves, but there’s still some [bugs][bugs] to be aware of.
 
 ## 📥 Installation
 
@@ -57,7 +57,7 @@ Teamtype works on Linux, macOS, Android, and on the Windows Subsystem for Linux.
 <summary>Binary releases</summary>
 
 The [releases on GitHub][releases] come with precompiled static binaries.
-Download one and put it somewhere in your shell's [`PATH`][path-variable]:
+Download one and put it somewhere in your shell’s [`PATH`][path-variable]:
 
 - `x86_64-unknown-linux-musl` for Linux
 - `universal-apple-darwin` for macOS
@@ -111,7 +111,7 @@ cargo binstall teamtype
 ### 2. Install an editor plugin
 
 - [Neovim][teamtype-nvim]
-- VS Code/Codium: Install the "Teamtype" extension from the marketplace
+- VS Code/Codium: Install the “Teamtype” extension from the marketplace
 
 ## 📖 Basic usage
 
@@ -155,29 +155,29 @@ Plugins:
 
 Work-in-progress plugins:
 
-- @sohalt's [Emacs plugin](https://github.com/sohalt/ethersync.el)
-- @hvergara's [Obsidian plugin](https://github.com/critica-tech-lab/pasta-obsidian)
-- @winniehell's [web editor](https://github.com/teamtype/teamtype-web)
+- @sohalt’s [Emacs plugin](https://github.com/sohalt/ethersync.el)
+- @hvergara’s [Obsidian plugin](https://github.com/critica-tech-lab/pasta-obsidian)
+- @winniehell’s [web editor](https://github.com/teamtype/teamtype-web)
 - [Emacs plugin](https://github.com/teamtype/teamtype/tree/emacs-plugin)
-- @thwischm's [Kakoune plugin](https://github.com/thwischm/kak-ethersync)
+- @thwischm’s [Kakoune plugin](https://github.com/thwischm/kak-ethersync)
 
 Bridges:
 
 - [Hedgedoc bridge prototype](https://github.com/teamtype/teamtype/tree/hedgedoc-prototype/daemon)
-- @dglittle's [Braid bridge](https://github.com/braid-org/braid-ethersync)
+- @dglittle’s [Braid bridge](https://github.com/braid-org/braid-ethersync)
 - [LSP bridge](https://github.com/teamtype/teamtype-lsp)
-- @3timeslazy's [LSP bridge](https://github.com/nonscalable/teamtype-lsp/tree/main/crates/teamtype-lsp) (see this [discussion](https://github.com/teamtype/teamtype/discussions/440))
+- @3timeslazy’s [LSP bridge](https://github.com/nonscalable/teamtype-lsp/tree/main/crates/teamtype-lsp) (see this [discussion](https://github.com/teamtype/teamtype/discussions/440))
 
 ## 🔨 Contributing
 
-We'd love to receive your patches and other contributions!
+We’d love to receive your patches and other contributions!
 Small patches are very welcome as PRs.
 Before starting to implement a new big feature, please briefly [check in with us](#contact) so we can discuss how it fits in with our ideas for the project.
 We have a [CONTRIBUTING.md](CONTRIBUTING.md) file that gives more guidance.
 Please take note of our [**strict no-LLM policy**](CONTRIBUTING.md).
 
-If you're interested in building new editor plugins, read the [editor plugin development guide][dev-guide].
-For more information about Teamtype's design, refer to the list of [decision records](docs/decisions/).
+If you’re interested in building new editor plugins, read the [editor plugin development guide][dev-guide].
+For more information about Teamtype’s design, refer to the list of [decision records](docs/decisions/).
 
 If you find bugs, please [open an issue][issues] on Github!
 
@@ -191,7 +191,7 @@ Other good channels:
 
 ## 💚 Thanks
 
-Teamtype received funding from [NLNet][nlnet]'s [NGI0 Core Fund][ngio-core] throughout 2024.
+Teamtype received funding from [NLNet][nlnet]’s [NGI0 Core Fund][ngio-core] throughout 2024.
 
 Thanks to the [Prototype Fund][prototype-fund] and the [Federal Ministry of Research, Technology and Space][bmbf] for funding this project in 2025.
 

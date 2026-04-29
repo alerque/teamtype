@@ -11,7 +11,7 @@ The main part of this documentation is aimed at users:
 
 - [Getting started](getting-started.md) shows you how to install Teamtype, and how to make your first steps in it.
 - [Concepts](concepts.md) goes into the fundamentals of how Teamtype operates, which is important for using it effectively.
-- [Features](features.md) explains various things you can do with it (and some things you can't do yet).
+- [Features](features.md) explains various things you can do with it (and some things you can’t do yet).
 - [Teamtype in practice](in-practice.md) contains detailed advice for how to use Teamtype for certain workflows.
 - [Related projects](related-projects.md) lists other software which have attempted to build similar systems.
 
