@@ -22,5 +22,5 @@ iroh_dns_domain = <iroh_dns_domain>
 iroh_pkarr_relay = <iroh_pkarr_relay>
 ```
 
-After a successful `teamtype join`, the peer's secret address is automatically stored in your `.teamtype/config`.
+After a successful `teamtype join`, the peer’s secret address is automatically stored in your `.teamtype/config`.
 In the future, you can then use `teamtype join` without a join code to reconnect to the same peer.

@@ -17,11 +17,11 @@ However, any change to the `.git` directory and the staging area (which is in fa
 This means that in this mode, Teamtype does not sync
 - commits you create,
 - files that you stage or unstage, or
-- changes you're making to the HEAD.
+- changes you’re making to the HEAD.
 
 This means that most Git operations you might try will not have an effect on connected peers.
 
-### Git commands that don't modify files
+### Git commands that don’t modify files
 
 These commands will not modify files, so you can run them without affecting connected peers (note that changes in your index or in your commits will not be shared):
 
@@ -38,7 +38,7 @@ We hope to build a smoother experience someday.
 
 - Synchronizing with a remote repository with `git push` and `git fetch`.
 - Use `git switch`/`git checkout` to switch to a different branch or get a specific file state from history.
-- Use `git reset --soft` or `git reset --mixed` to modify the staging area and the HEAD "manually".
+- Use `git reset --soft` or `git reset --mixed` to modify the staging area and the HEAD “manually”.
 - Use `git restore`/`git checkout -- <pathspec>`/`git reset --hard HEAD` to undo your changes or get a different content of a file from the Git history.
 
 If you notice any discrepancies between directory content of connected peers, you can turn off the daemon, and restart it.
@@ -87,12 +87,12 @@ All peers can then use `git status`/`git diff` to double check that they have th
 
 ## Recommended note-taking workflow
 
-In the note taking use case, you can use Git for keeping your own local backup copy of the note's contents.
+In the note taking use case, you can use Git for keeping your own local backup copy of the note’s contents.
 You can then use it, to track which parts have been changed by others, for example while you were offline.
 
-Let's say you have initially added and committed all notes.
+Let’s say you have initially added and committed all notes.
 - Whenever you are reconnecting to the cloud peer and are getting some changes, you can revise them by looking at the git diff.
-- Then you can add and commit them with an unimportant commit message to set a "savepoint" for next time
+- Then you can add and commit them with an unimportant commit message to set a “savepoint” for next time
 
-It's also a nice little back-up in case anything goes wrong with the sync.
+It’s also a nice little back-up in case anything goes wrong with the sync.
 Which might happen given that this is very new and bleeding edge software, be it through bugs or misunderstandings.

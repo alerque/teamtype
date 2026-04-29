@@ -19,7 +19,7 @@ It is mainly meant to be used with Teamtype, but can also be configured to work 
 
 ### Manual installation
 
-If you're not using a plugin manager, here's a "quick and dirty" way to install the plugin:
+If you’re not using a plugin manager, here’s a “quick and dirty” way to install the plugin:
 
 ```
 git clone https://github.com/teamtype/teamtype-nvim $HOME/.local/share/nvim/site/pack/plugins/start/teamtype
@@ -28,7 +28,7 @@ git clone https://github.com/teamtype/teamtype-nvim $HOME/.local/share/nvim/site
 ### Plugin managers
 
 Usually, you will add the string `"teamtype/teamtype-nvim"` to your plugin manager.
-Here's some example configuration blocks:
+Here’s some example configuration blocks:
 
 #### Lazy
 

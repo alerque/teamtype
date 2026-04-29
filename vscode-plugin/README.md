@@ -7,7 +7,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 
 # VS Code plugin for 🍃 [Teamtype](https://github.com/teamtype/teamtype)-compatible projects
 
-Note: You will need to install and run a "collaboration server" like Teamtype in addition to this plugin!
+Note: You will need to install and run a “collaboration server” like Teamtype in addition to this plugin!
 
 Refer to the [main project](https://github.com/teamtype/teamtype) for documentation and usage instructions.
 

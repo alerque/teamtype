@@ -10,7 +10,7 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 There have been a number of attempts of enabling collaborative text editing!
 If you think a project is missing, feel free to [submit an issue or a PR][teamtype] to add them to the list!
 
-<!-- Note for editors: This table uses "binary ordering" - first order by the first column, then the second, and so on. -->
+<!-- Note for editors: This table uses “binary ordering” - first order by the first column, then the second, and so on. -->
 
 |                                                           | Open-source | Active[^a] | Peer-to-peer | CRDT[^c] | Editor-agnostic                                        |
 |-----------------------------------------------------------|-------------|------------|--------------|----------|--------------------------------------------------------|
@@ -42,7 +42,7 @@ If you think a project is missing, feel free to [submit an issue or a PR][teamty
 | [Code With Me][codewithme]                                | ❌          | ❌         | ❌           | ❌       | ❌ (JetBrains IDEs)                                    |
 
 [^a]: Actively developed as of April 2026
-[^c]: Uses Conflict-free Replicated Data Types, a requirement for good "local-first" support
+[^c]: Uses Conflict-free Replicated Data Types, a requirement for good “local-first” support
 [^n]: Not currently released, but developed and expected in the next major release
 [^server]: Open-source plugins, proprietary server
 [^mixed]: Open-source core with limited features
