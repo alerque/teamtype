@@ -62,14 +62,21 @@ async fn main() -> Result<()> {
     setup_teamtype_directory(&directory, temporary_directory.as_ref())
         .context("Failed to find .teamtype/ directory")?;
 
-    // TODO: If the result of this joined future handle were to go out of scope and hence be
+    // TODO: If the result of this joined future handles were to go out of scope and hence be
     // dropped, *some* but not all parts of the daemon would shut down. Notably the local socket
     // will go away but the remote networking connections would stay up! This is a fundamental issue
     // with the daemon module and merits refactoring so the long running socket and network
     // listeners properly listen to the mpsc channel or receive and process a cancellation token.
     let _handle = match cli.command {
-        Commands::Share { .. } | Commands::Join { .. } => run_daemon(cli, directory.clone()).await,
         Commands::Client => return run_client(directory.clone()).await,
+        Commands::Join { .. } => {
+            let join_config = parse_join_config(cli.command, directory.clone()).await?;
+            run_daemon(join_config, false).await
+        }
+        Commands::Share { init, .. } => {
+            let share_config = parse_share_config(cli.command, directory.clone());
+            run_daemon(share_config, init).await
+        }
     };
 
     trap_shutdown().await;
@@ -77,8 +84,8 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn run_daemon(cli: Cli, directory: PathBuf) -> Result<Daemon> {
-    let persist = !config::has_git_remote(&directory);
+async fn run_daemon(app_config: AppConfig, init_doc: bool) -> Result<Daemon> {
+    let persist = !config::has_git_remote(&app_config.base_dir);
     if !persist {
         // TODO: drop .teamtype/doc here? Would that be rude?
         info!(
@@ -86,85 +93,7 @@ async fn run_daemon(cli: Cli, directory: PathBuf) -> Result<Daemon> {
         );
     }
 
-    config::ensure_teamtype_is_ignored(&directory)?;
-
-    let mut init_doc = false;
-    let mut app_config;
-
-    match cli.command {
-        Commands::Share {
-            init,
-            no_join_code,
-            shared_flags:
-                ShareJoinFlags {
-                    magic_wormhole_relay,
-                    iroh_relay,
-                    iroh_dns_domain,
-                    iroh_pkarr_relay,
-                    sync_vcs,
-                    username,
-                    ..
-                },
-            show_secret_address,
-            ..
-        } => {
-            init_doc = init;
-
-            let app_config_cli = AppConfig {
-                base_dir: directory,
-                peer: None,
-                emit_join_code: !no_join_code,
-                emit_secret_address: show_secret_address,
-                magic_wormhole_relay,
-                iroh_relay,
-                iroh_dns_domain,
-                iroh_pkarr_relay,
-                sync_vcs,
-                username,
-            };
-            app_config = AppConfig::from_config_file_and_cli(app_config_cli);
-
-            // Because of the "share" subcommand, explicitly don't connect anywhere.
-            app_config.peer = None;
-        }
-        Commands::Join {
-            join_code,
-            shared_flags:
-                ShareJoinFlags {
-                    magic_wormhole_relay,
-                    iroh_relay,
-                    iroh_dns_domain,
-                    iroh_pkarr_relay,
-                    sync_vcs,
-                    username,
-                    ..
-                },
-            ..
-        } => {
-            let app_config_cli = AppConfig {
-                base_dir: directory,
-                peer: join_code.map(config::Peer::JoinCode),
-                emit_join_code: false,
-                emit_secret_address: false,
-                magic_wormhole_relay,
-                iroh_relay,
-                iroh_dns_domain,
-                iroh_pkarr_relay,
-                sync_vcs,
-                username,
-            };
-
-            app_config = AppConfig::from_config_file_and_cli(app_config_cli);
-
-            app_config = app_config
-                .resolve_peer()
-                .await
-                .context("Failed to resolve peer")?;
-        }
-        Commands::Client => {
-            unreachable!("This can't happen, as we earlier matched on Share|Join.")
-        }
-    }
+    config::ensure_teamtype_is_ignored(&app_config.base_dir)?;
 
     if app_config.sync_vcs && config::has_local_user_config(&app_config.base_dir).is_ok_and(|v| v) {
         warn!(
@@ -180,6 +109,83 @@ async fn run_daemon(cli: Cli, directory: PathBuf) -> Result<Daemon> {
     Daemon::new(app_config, init_doc, persist)
         .await
         .context("Failed to launch the daemon")
+}
+
+async fn parse_join_config(command: Commands, directory: PathBuf) -> Result<AppConfig> {
+    if let Commands::Join {
+        join_code,
+        shared_flags:
+            ShareJoinFlags {
+                magic_wormhole_relay,
+                iroh_relay,
+                iroh_dns_domain,
+                iroh_pkarr_relay,
+                sync_vcs,
+                username,
+                ..
+            },
+        ..
+    } = command
+    {
+        let app_config_cli = AppConfig {
+            base_dir: directory,
+            peer: join_code.map(config::Peer::JoinCode),
+            emit_join_code: false,
+            emit_secret_address: false,
+            magic_wormhole_relay,
+            iroh_relay,
+            iroh_dns_domain,
+            iroh_pkarr_relay,
+            sync_vcs,
+            username,
+        };
+        let mut app_config = AppConfig::from_config_file_and_cli(app_config_cli);
+        app_config = app_config
+            .resolve_peer()
+            .await
+            .context("Failed to resolve peer")?;
+        Ok(app_config)
+    } else {
+        unreachable!("Only Join commands beget Join configs.")
+    }
+}
+
+fn parse_share_config(command: Commands, directory: PathBuf) -> AppConfig {
+    if let Commands::Share {
+        no_join_code,
+        shared_flags:
+            ShareJoinFlags {
+                magic_wormhole_relay,
+                iroh_relay,
+                iroh_dns_domain,
+                iroh_pkarr_relay,
+                sync_vcs,
+                username,
+                ..
+            },
+        show_secret_address,
+        ..
+    } = command
+    {
+        let app_config_cli = AppConfig {
+            base_dir: directory,
+            peer: None,
+            emit_join_code: !no_join_code,
+            emit_secret_address: show_secret_address,
+            magic_wormhole_relay,
+            iroh_relay,
+            iroh_dns_domain,
+            iroh_pkarr_relay,
+            sync_vcs,
+            username,
+        };
+        let mut app_config = AppConfig::from_config_file_and_cli(app_config_cli);
+        // Because of the "share" subcommand, explicitly don't connect anywhere.
+        app_config.peer = None;
+        app_config
+    } else {
+        unreachable!("Only Share commands beget Share configs.")
+    }
 }
 
 async fn run_client(directory: PathBuf) -> Result<()> {
