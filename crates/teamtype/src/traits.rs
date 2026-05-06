@@ -16,6 +16,11 @@ pub trait Interactions: Send + Sync {
     /// continuing.
     fn confirm(&self, question: &str) -> Result<bool>;
 
+    /// Log a message that is not essential to function and may only be seen if the user has
+    /// verbose mode enabled or is watching a log file, but could be useful to keep track of what is
+    /// going on.
+    fn log(&self, message: &str);
+
     /// Inform the user about an important bit of information that should be raised to their attention
     /// in whatever UI is relevant for normal operation. This may or may not interrupt a user
     /// depending on whether they look at the relevant bit of interface, but it will be presented

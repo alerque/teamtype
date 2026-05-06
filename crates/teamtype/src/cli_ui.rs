@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Result};
 use inquire::Confirm;
-use nu_ansi_term::Color;
+use nu_ansi_term::{Color, Style};
 use teamtype::traits::Interactions;
 use tracing::debug;
 
@@ -18,6 +18,12 @@ impl Interactions for ConsoleInteractions {
             .with_default(false)
             .prompt()
             .context("Failed to read answer to y/n prompt")
+    }
+
+    fn log(&self, message: &str) {
+        let dimmed = Style::new().dimmed();
+        debug!("UI log event: {message}");
+        println!("{}", dimmed.paint(message));
     }
 
     fn inform(&self, message: &str) {

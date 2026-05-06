@@ -14,7 +14,6 @@ use anyhow::{Context, Result};
 use docstr::docstr;
 use git2::{Config as GitConfig, ConfigLevel, Error as GitError, Repository};
 use ini::{Ini, Properties};
-use tracing::info;
 
 use crate::sandbox;
 use crate::types::UserInterface;
@@ -144,14 +143,14 @@ impl AppConfig {
                 )
                 .await
                 .context("Failed to retrieve secret address, was this join code already used?")?;
-                info!(
-                    "Derived peer from join code. Storing in config (overwriting previous config)."
+                ui.log(
+                    "Derived peer from join code. Storing in config (overwriting previous config).",
                 );
                 store_peer_in_config(&self.base_dir, &self.config_file(), &secret_address, ui)?;
                 Peer::SecretAddress(secret_address)
             }
             Some(Peer::SecretAddress(secret_address)) => {
-                info!("Using peer from config file.");
+                ui.log("Using peer from config file.");
                 Peer::SecretAddress(secret_address)
             }
             None => {
@@ -172,9 +171,9 @@ pub fn store_peer_in_config(
     directory: &Path,
     config_file: &Path,
     peer: &str,
-    _ui: &UserInterface,
+    ui: &UserInterface,
 ) -> Result<()> {
-    info!("Storing peer's address in .teamtype/config.");
+    ui.log("Storing peer's address in .teamtype/config.");
 
     let content = format!("peer={peer}\n");
     sandbox::write_file(directory, config_file, content.as_bytes())
@@ -228,50 +227,48 @@ fn get_username(
         .unwrap_or_else(|| get_username_from_fallback_value(ui))
 }
 
-fn get_username_from_cli(username: String, _ui: &UserInterface) -> String {
-    info!("Using the username '{username}' to display next to the cursors other people see.");
+fn get_username_from_cli(username: String, ui: &UserInterface) -> String {
+    ui.log(&format!(
+        "Using the username '{username}' to display next to the cursors other people see."
+    ));
     username
 }
 
 fn get_username_from_config_file(
     general_section: &Properties,
-    _ui: &UserInterface,
+    ui: &UserInterface,
 ) -> Option<String> {
     general_section
         .get("username")
         .map(ToString::to_string)
         .map(|username| {
-            info!("Using the username '{username}' from `.teamtype/config` as username, to display next to the cursors other people see.");
+            ui.log(&format!(
+                "Using the username '{username}' from `.teamtype/config` as username, to display next to the cursors other people see."
+            ));
             username
         })
 }
 
-fn get_username_from_git(base_dir: &Path, _ui: &UserInterface) -> Option<String> {
+fn get_username_from_git(base_dir: &Path, ui: &UserInterface) -> Option<String> {
     let username = get_git_username(base_dir);
     if let Some(ref username) = username {
-        info!(
-            "{}",
-            &docstr!(format!
-                /// Using the Git username '{username}' as username, to display next to the cursors other people see.
-                /// Teamtype uses the Git username as username by default.
-                /// You can set the configuration value `username` in your `.teamtype/config` to override this username.
-                /// You can also use the flag `--username` when using the `share`/`join` subcommands.
-            )
-        );
+        ui.log(&docstr!(format!
+            /// Using the Git username '{username}' as username, to display next to the cursors other people see.
+            /// Teamtype uses the Git username as username by default.
+            /// You can set the configuration value `username` in your `.teamtype/config` to override this username.
+            /// You can also use the flag `--username` when using the `share`/`join` subcommands.
+        ));
     }
     username
 }
 
-fn get_username_from_fallback_value(_ui: &UserInterface) -> String {
+fn get_username_from_fallback_value(ui: &UserInterface) -> String {
     let username = USERNAME_FALLBACK.to_string();
-    info!(
-        "{}",
-        &docstr!(format!
-            /// Using the fallback value for username '{username}' as username, to display next to the cursors other people see.
-            /// You can set the configuration value `username` in your `.teamtype/config` to override this username.
-            /// You can also use the flag `--username` when using the `share`/`join` subcommands.
-        )
-    );
+    ui.log(&docstr!(format!
+        /// Using the fallback value for username '{username}' as username, to display next to the cursors other people see.
+        /// You can set the configuration value `username` in your `.teamtype/config` to override this username.
+        /// You can also use the flag `--username` when using the `share`/`join` subcommands.
+    ));
     username
 }
 
