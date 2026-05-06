@@ -6,8 +6,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 [package]
-name = "integration-tests"
-description = "End-to-end testing of Teamtype."
+name = "e2e-tests"
+description = "End-to-end testing of Teamtype including plugin integrations."
 publish = false
 version.workspace = true
 authors.workspace = true
@@ -19,15 +19,24 @@ rust-version.workspace = true
 name = "fuzzer"
 # We set process-global state in this test, so we want to run our own main method.
 harness = false
+# Don't include fuzzer in default test runs.
+test = false
 
 [dependencies]
 async-trait.workspace = true
-nvim-rs = { version = "0.9", features = ["use_tokio"] }
 rand = "0.10"
 serde_json.workspace = true
 teamtype.workspace = true
 tempfile.workspace = true
-tokio = { version = "1", default-features = false, features = ["process"] }
+
+[dependencies.nvim-rs]
+version = "0.9"
+features = ["use_tokio"]
+
+[dependencies.tokio]
+version = "1"
+default-features = false
+features = ["process"]
 
 [dev-dependencies]
 anyhow.workspace = true
@@ -35,3 +44,6 @@ futures.workspace = true
 pretty_assertions.workspace = true
 serial_test = "3"
 tracing.workspace = true
+
+[lints]
+workspace = true
