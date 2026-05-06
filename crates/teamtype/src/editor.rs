@@ -21,7 +21,7 @@ use tokio_util::{
     bytes::BytesMut,
     codec::{Decoder, Encoder, FramedRead, FramedWrite, LinesCodec},
 };
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::daemon::{DocMessage, DocumentActorHandle};
 use crate::editor_protocol::{
@@ -180,7 +180,7 @@ async fn handle_editor_connection(
     stream: UnixStream,
     document_handle: DocumentActorHandle,
     editor_id: EditorId,
-    _ui: &UserInterface,
+    ui: &UserInterface,
 ) {
     let (stream_read, stream_write) = tokio::io::split(stream);
     let mut reader = FramedRead::new(stream_read, IncomingProtocolCodec);
@@ -189,7 +189,7 @@ async fn handle_editor_connection(
     document_handle
         .send_message(DocMessage::NewEditorConnection(editor_id, writer))
         .await;
-    info!("Editor #{editor_id} connected.");
+    ui.log(&format!("Editor #{editor_id} connected."));
 
     while let Some(message) = reader.next().await {
         match message {
@@ -221,5 +221,5 @@ async fn handle_editor_connection(
     document_handle
         .send_message(DocMessage::CloseEditorConnection(editor_id))
         .await;
-    info!("Editor #{editor_id} disconnected.");
+    ui.log(&format!("Editor #{editor_id} disconnected."));
 }

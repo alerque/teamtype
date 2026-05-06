@@ -10,7 +10,6 @@ use anyhow::Result;
 use docstr::docstr;
 use magic_wormhole::{AppConfig, AppID, Code, MailboxConnection, Wormhole, transfer};
 use tokio::time::sleep;
-use tracing::info;
 
 const NETWORK_RETRY: Duration = Duration::from_mins(5);
 
@@ -75,12 +74,12 @@ pub async fn get_secret_address_from_wormhole(
 
 fn build_magic_wormhole_config(
     magic_wormhole_relay: Option<String>,
-    _ui: &UserInterface,
+    ui: &UserInterface,
 ) -> AppConfig<transfer::AppVersion> {
     let mut config = transfer::APP_CONFIG.id(AppID::new("teamtype"));
 
     if let Some(url) = magic_wormhole_relay {
-        info!("Using non-default Magic Wormhole relay url {}", url);
+        ui.log(&format!("Using non-default Magic Wormhole relay url {url}"));
         config = config.rendezvous_url(Cow::Owned(url));
     }
     config

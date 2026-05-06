@@ -54,6 +54,10 @@ impl Interactions for FuzzerInteractions {
         Ok(false)
     }
 
+    fn log(&self, message: &str) {
+        debug!(message);
+    }
+
     fn inform(&self, message: &str) {
         info!(message);
     }
@@ -112,7 +116,7 @@ async fn main() -> Result<()> {
     actors.insert("peer".to_string(), Box::new(peer));
     actors.insert("nvim2".to_string(), Box::new(nvim2));
 
-    info!("Performing edits");
+    ui.log("Performing edits");
 
     let handles = actors
         .iter_mut()
@@ -121,7 +125,7 @@ async fn main() -> Result<()> {
 
     let mut contents: HashMap<String, String> = HashMap::new();
 
-    info!("Waiting for all contents to be equal");
+    ui.log("Waiting for all contents to be equal");
 
     timeout(Duration::from_secs(5 * 60), async {
         loop {
