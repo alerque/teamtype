@@ -15,7 +15,7 @@ use automerge::{
     transaction::Transactable,
 };
 use dissimilar::Chunk;
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::path::RelativePath;
 use crate::types::{EditorTextDelta, PatchEffect, TextDelta, UserInterface};
@@ -39,7 +39,7 @@ pub enum Content {
 pub struct Document {
     files: HashMap<RelativePath, Content>,
     doc: AutoCommit,
-    _ui: UserInterface,
+    ui: UserInterface,
 }
 
 impl Document {
@@ -60,7 +60,7 @@ impl Document {
         let mut result = Self {
             files: HashMap::default(),
             doc,
-            _ui: ui.clone(),
+            ui: ui.clone(),
         };
         result.update_files();
         result
@@ -241,7 +241,8 @@ impl Document {
             }
 
             let text_delta: TextDelta = chunks.into();
-            info!("Detected change of {file_path}. Updating.");
+            self.ui
+                .log(&format!("Detected change of {file_path}. Updating."));
             debug!("Full delta of this update: {text_delta}");
             self.apply_delta_to_doc(&text_delta, file_path).expect("Failed to apply delta to document while updating text. Probably the delta doesn't fit the document content.");
 
@@ -264,7 +265,8 @@ impl Document {
             return;
         }
 
-        info!("Removing {file_path} from the Teamtype history.");
+        self.ui
+            .log(&format!("Removing {file_path} from the Teamtype history."));
 
         // Remove from Automerge document.
         let file_map = self
@@ -281,7 +283,9 @@ impl Document {
     pub fn set_file(&mut self, content: Content, file_path: &RelativePath) {
         match content {
             Content::String(ref text) => {
-                info!("Initializing {file_path} in the Teamtype history.");
+                self.ui.log(&format!(
+                    "Initializing {file_path} in the Teamtype history."
+                ));
                 self.files
                     .insert(file_path.clone(), Content::String(text.clone()));
 
@@ -313,7 +317,9 @@ impl Document {
 
                 // If the file was not in the document before, log this.
                 if !self.file_exists(file_path) {
-                    info!("Initializing binary {file_path} in the Teamtype history.");
+                    self.ui.log(&format!(
+                        "Initializing binary {file_path} in the Teamtype history."
+                    ));
                 }
 
                 self.doc

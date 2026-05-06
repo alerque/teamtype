@@ -23,7 +23,7 @@ use teamtype::{
 };
 use tempfile::{TempDir, tempdir_in};
 use tokio::signal;
-use tracing::{debug, info};
+use tracing::debug;
 
 use self::cli::{Cli, Commands, ShareJoinFlags};
 
@@ -96,7 +96,7 @@ async fn run_daemon(app_config: AppConfig, init_doc: bool, ui: &UserInterface) -
     let persist = !config::has_git_remote(&app_config.base_dir);
     if !persist {
         // TODO: drop .teamtype/doc here? Would that be rude?
-        info!(
+        ui.log(
             "Detected a Git remote: Assuming a pair-programming use-case and starting a new history."
         );
     }
@@ -336,10 +336,10 @@ fn setup_teamtype_directory(
         let teamtype_dir = directory.join(config::CONFIG_DIR);
         let directory_is_temporary_directory = temporary_directory.is_some();
         if directory_is_temporary_directory {
-            info!(
+            ui.log(&format!(
                 "'{}' is the temporary directory that is used as a Teamtype directory.",
-                &directory.display()
-            );
+                directory.display()
+            ));
             sandbox::create_dir(directory, &teamtype_dir)?;
         } else if ui.confirm(&docstr!(format!
             /// '{}' hasn't been used as a Teamtype directory before.
@@ -349,7 +349,7 @@ fn setup_teamtype_directory(
             config::CONFIG_DIR
         ))? {
             sandbox::create_dir(directory, &teamtype_dir)?;
-            info!("Created! Resuming launch.");
+            ui.log("Created! Resuming launch.");
         } else {
             bail!("Aborting launch. Teamtype needs a .teamtype/ directory to function");
         }

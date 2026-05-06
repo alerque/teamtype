@@ -28,7 +28,7 @@ use tokio::{
     time::sleep,
     time::{Duration, Instant},
 };
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::config::{self, AppConfig};
 use crate::document::{self, Document};
@@ -253,7 +253,7 @@ impl DocumentActor {
                         }
                         PatchEffect::FileRemoval(file_path) => {
                             if self.owns(&file_path) {
-                                info!("Removing file {file_path}.");
+                                self.ui.inform(&format!("Removing file {file_path}."));
 
                                 sandbox::remove_file(
                                     &self.app_config.base_dir,
@@ -297,9 +297,9 @@ impl DocumentActor {
                                     // modifications to the editors, and these contents should be
                                     // consistent. So we don't need to do anything.
                                 } else {
-                                    info!(
+                                    self.ui.inform(&format!(
                                         "Peer deleted {file_path}, but you have it open in an editor. Bringing back an empty version."
-                                    );
+                                    ));
                                     self.crdt_doc.update_text("", &file_path);
                                 }
                             }
@@ -612,7 +612,7 @@ impl DocumentActor {
                 debug!("Failed to read {abs_path} to check for equal content before writing.");
             }
         } else {
-            info!("Creating file {file_path}.");
+            self.ui.inform(&format!("Creating file {file_path}."));
         }
 
         sandbox::write_file(&self.app_config.base_dir, &abs_path, bytes)
@@ -1142,6 +1142,7 @@ mod tests {
                 let (ephemeral_message_tx, _ephemeral_message_rx) =
                     broadcast::channel::<EphemeralMessage>(100);
 
+                //
                 let ui = &UserInterface::new(TestInteractions {});
 
                 Self::new(
