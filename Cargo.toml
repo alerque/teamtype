@@ -37,6 +37,8 @@ default-features = false
 
 [workspace.dependencies.teamtype]
 path = "crates/teamtype"
+artifact = "bin"
+lib = true
 
 # Stripping symbols (not debuginfo) reduces binary size by ~1.5x.
 # This is the default profile for `cargo install`:

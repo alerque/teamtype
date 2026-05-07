@@ -43,7 +43,7 @@ check *ARGS: (check-cargo ARGS) check-typos
 
 [group('check')]
 check-cargo *ARGS:
-    {{ cargo }} check {{ ARGS }}
+    {{ cargo }} +nightly -Z bindeps check {{ ARGS }}
 
 [group('check')]
 check-typos:
@@ -56,7 +56,7 @@ check-typos:
 
 [group('build')]
 build *ARGS:
-    {{ cargo }} build --profile {{ profile }} {{ ARGS }}
+    {{ cargo }} +nightly -Z bindeps build --profile {{ profile }} {{ ARGS }}
 
 [group('build')]
 build-release *ARGS:
@@ -77,7 +77,7 @@ format-lua:
 
 [group('format')]
 format-rust:
-    {{ cargo }} +nightly fmt
+    {{ cargo }} +nightly -Z bindeps fmt
 
 [group('lint')]
 [parallel]
@@ -94,7 +94,7 @@ lint-format-lua:
 
 [group('lint')]
 lint-format-rust:
-    {{ cargo }} +nightly fmt --check
+    {{ cargo }} +nightly -Z bindeps fmt --check
 
 [group('lint')]
 lint-license:
@@ -111,18 +111,18 @@ lint-manifests:
 
 [group('lint')]
 lint-rust:
-    {{ cargo }} clippy
+    {{ cargo }} +nightly -Z bindeps clippy
 
 [group('test')]
 test *ARGS: (test-cargo ARGS)
 
 [group('test')]
 test-cargo *ARGS: build
-    {{ cargo }} test {{ ARGS }}
+    {{ cargo }} +nightly -Z bindeps test {{ ARGS }}
 
 [group('test')]
 fuzz: build
-    {{ cargo }} test --test fuzzer
+    {{ cargo }} +nightly -Z bindeps test --test fuzzer
 
 # Verify all the things: check, lint, test, and fuzz.
 [parallel]
