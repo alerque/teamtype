@@ -37,3 +37,11 @@ futures.workspace = true
 pretty_assertions.workspace = true
 serial_test = "3"
 tracing.workspace = true
+
+[dev-dependencies.teamtype]
+path = ".."
+artifact = "bin"
+lib = true
+
+# This crate needs to define specific optimization settings, so we can't put it in the
+# same workspace.
