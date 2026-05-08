@@ -13,15 +13,16 @@ use std::path::{Path, PathBuf};
 use anyhow::bail;
 use anyhow::{Context, Result};
 use futures::StreamExt;
-use tokio::{
-    io::WriteHalf,
-    net::{UnixListener, UnixStream},
-};
+use tokio::io::WriteHalf;
+#[cfg(unix)]
+use tokio::net::{UnixListener, UnixStream};
 use tokio_util::{
     bytes::BytesMut,
     codec::{Decoder, Encoder, FramedRead, FramedWrite, LinesCodec},
 };
 use tracing::{debug, error, info};
+#[cfg(windows)]
+use uds_windows::{UnixListener, UnixStream};
 
 use crate::cli_ask::ask;
 use crate::daemon::{DocMessage, DocumentActorHandle};

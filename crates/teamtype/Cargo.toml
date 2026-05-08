@@ -75,6 +75,9 @@ tempfile.workspace = true
 tracing.workspace = true
 url = "2"
 
+[target.'cfg(windows)'.dependencies]
+uds_windows = "1"
+
 [dependencies.clap]
 version = "4.5"
 features = ["derive", "env"]
