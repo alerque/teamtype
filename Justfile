@@ -4,10 +4,12 @@
 
 cargo := require('cargo')
 cargo-deny := require('cargo-deny')
+cargo-semver-checks := require('cargo-semver-checks')
+cargo-set-version := require('cargo-set-version')
 eslint := require('eslint')
+gh := require('gh')
 git := require('git')
 git-cliff := require('git-cliff')
-gh := require('gh')
 jq := require('jq')
 just := just_executable()
 luacheck := require('luacheck')
@@ -176,6 +178,62 @@ nvim *ARGS: build-test
 teamtype *ARGS: build-test
     $TEAMTYPE_BINARY {{ maybe-pass(ARGS) }}
 
+# Block execution of other jobs if the Git working tree isn't pristine.
+[group('release')]
+[private]
+pristine:
+    # Make sure Git's status cache is warmed up.
+    {{ git }} diff --shortstat
+    # Ensure there are no changes in staging.
+    {{ git }} diff-index --quiet --cached HEAD || exit 1
+    # Ensure there are no changes in the working tree.
+    {{ git }} diff-files --quiet || exit 1
+
+read-current-user() := shell('whoami || echo $USER')
+read-recent-tag() := shell(git + ' tag --list | tail -1')
+
+# Verify privileges needed for publishing, hopefully before the process is half way done.
+[group('release')]
+[private]
+check-credentials:
+    # See if Git is going to allow us to push a tag by dry running an old one
+    {{ git }} push --dry-run origin {{ read-recent-tag() }}
+    # Verify that Cargo is logged in, can read the remote API, and that the current shell
+    # user has some resemblance to listed crate owners. Not an actual proof, just a heuristic.
+    {{ cargo }} owner --list teamtype | grep -qF '{{ read-current-user() }}'
+
+read-manifest-version() := shell(cargo + ' metadata --no-deps --format-version 1 | ' + jq + ' -r .packages[0].version')
+read-suggested-bump() := trim(shell(git-cliff + ' --unreleased --bumped-version'))
+
+# Run smoke tests on a proposed semver, check that it's a big enough bump to satisfy tooling's urges.
+[group('release')]
+[private]
+validate-semver semver:
+    # Is the tag even a valid semver?
+    {{ semver_matches(semver, '>=' + read-manifest-version()) }}
+    # Check that API changes don't suggest a different level of semver bump.
+    # TODO: Remove bypass after announcing the public library API, also see https://github.com/obi1kenobi/cargo-semver-checks/pull/1652.
+    {{ cargo-semver-checks }} semver-checks || true
+    # Check that unreleased commit messages don't suggest a different level of semver bump.
+    [[ {{ read-suggested-bump() }} == {{ semver }} ]]
+
+rev-parse(ref) := shell(git + ' rev-parse --abbrev-ref ' + ref)
+
+# - Create a new branch (release-0.x.y)
+#     - Open a PR with it (so CI can run)
+
+# Open a PR with a proposed change log to be edited into release notes.
+[group('release')]
+prepare-release semver: pristine (validate-semver semver) perfect
+    # check that *not* on default branch
+    [[ {{ default-branch }} != {{ rev-parse('HEAD') }} ]]
+    # draft changelog from conventional commits
+    {{ just }} perfect
+    {{ cargo }} publish --dry-run --allow-dirty
+
+# - Create a new branch (release-0.x.y)
+#     - Open a PR with it (so CI can run)
+
 # Get an early look at what the changelog draft would look like for a release.
 [group('release')]
 preview-changelog:
@@ -190,65 +248,47 @@ preview-branch-changelog:
         <({{ git-cliff }} {{ read-last-tag() + ".." + default-remote + "/" + default-branch }}) \
         <({{ git-cliff }} --unreleased)
 
-# - Check the changelog wiki page for breaking changes or TODOs
-#     - *could* be determined using conventional commit messages, by an !
-# - Update the changelog
-#     - changelog generator could release a first draft of it
-#         - caleb likes git-cliff
-#         - caleb usually filters out tooling changes
-#             - one PR could have many commits, but only 1-2 feat commits
-#         - could potentially also contain the body, and link to the PR
-#         - maybe preface it with a summary
-#         - plan: have job generate a "first draft", ready for editing
-#         - prerelease
-#             - generate changelog draft
-#             - check tests
-#         - release
-#         - postrelease (to check for existence of binaries in release?)
-#     - `git log v0.3.0..HEAD --reverse --oneline`
-#     - Change the heading that says (unreleased) to the actual release heading, including the date
-#     - Create a commit
-# - Bump the Cargo TOML version
-#     - Remove dev
-#         - caleb's suggestion: don't use -dev, but add build.rs to add -r<num> to version
-#     - Run `cargo check` in daemon/ and in daemon/integration-tests to bump the teamtype dependency
-#     - Create commit
-# - Create a new branch (release-0.x.y)
-#     - Open a PR with it (so CI can run)
-# - Publish to Cargo
-#     - (optional) cargo publish --dry-run
-#     - cargo publish
-# - If necessary, re-release the VS Code plugin
-#     - (follow the release steps in vscode-plugin/DEVELOPMENT.md)
-#     - Create commit
-#     - Generate a token for vsce publish, e.g., at https://dev.azure.com/nt4u/_usersSettings/tokens
-#         - Token not working? Create a new one. A “personal” one for yourself is sufficient.
-# - Tag the version
-#     - Merge the PR
-#     - Create a git tag v0.x.x, and push the tag
-#         `git push --tags origin v0.x.x`
-#     - (=> GitHub automatically builds the release and updates teamtype-nvim `main`)
-#         - Quickly check that the -static binaries are created correctly, then delete this item.
-# - Next dev release number
-#     - Add a new heading in the changelog, marked (unreleased)
-#     - In Cargo.toml
-# - Write a Toot, or announce the release elsewhere
-#
-# Pre-releases?
-#
-# - Crates can have a pre-release part: https://doc.rust-lang.org/cargo/reference/manifest.html#the-version-field
-#     - e.g., 0.7.0-beta.0, then 0.7.0-beta.1, etc.
-# - Neovim currently has no versions; it follows the main branch
-#     - In the future: releases only on the main branch? And then a development branch for more recent versions?
-# - VS Code https://code.visualstudio.com/api/working-with-extensions/publishing-extension#prerelease-extensions
-#     - No support for pre-release tags :/ “Full semver support will be available in the future.”
-#     - Recommendation: major.EVEN_NUMBER.patch for release versions, major.ODD_NUMBER.patch for pre-releases...
-#         - I guess we should probably do it that way for now...
-#         - Alternative: 0.major.(minor+1), and then possibly 0.(major+1).0
-#         - Or just go straight to 0.(major+1).0. And the first “stable” version would then be 0.(major+1).1
-#     - Use the vsce package --pre-release!
+release-pr-filter(semver) := f'.[] | select(.headRepository.nameWithOwner == "teamtype/teamtype") | select(.headRefName == "release-v{{semver}}") | .number'
+find-release-pr(semver) := shell(gh + f" pr list --json headRefName,headRepository,number --jq '{{release-pr-filter(semver)}}'")
+read-pr-merge-state(prno) := shell(gh + f" pr view {{prno}} --json mergeStateStatus --jq .mergeStateStatus")
 
+# Gate release action on having previously and properly prepared one.
+[group('release')]
+[private]
+release-is-prepared semver:
+    # Check that changelog draft PR is ready for merge.
+    [[ "{{ read-pr-merge-state(find-release-pr(semver)) }}" == "CLEAN" ]]
+
+# Set the version in manifests, tag, commit, and publish.
+[group('release')]
+release semver: (release-is-prepared semver) check-credentials perfect
+    # consider auto-merging release PR?
+    {{ cargo-set-version }} set-version {{ semver }}
+    # stage changes
+    {{ git }} commit -m 'chore: Release v{{ semver }}'
+    # extract changelog blob
+    # add release header to changelog blog
+    # TODO: Sign release tags
+    {{ git }} tag v{{ semver }} -F teamtype-{{ semver }}.md
+    {{ cargo }} publish --dry-run
+    {{ git }} push --atomic {{ default-remote }} {{ default-branch }} v{{ semver }}
+    {{ cargo }} publish --locked
+
+count-release-assets(semver) := shell(gh + ' release view v' + semver + ' --json assets --jq ".assets | length"')
 read-release-url(semver) := shell(gh + f" release view v{{semver}} --json url --jq .url")
+
+# Verify everything is copastetic and suggest next steps.
+[group('release')]
+post-release semver:
+    # Verify release has some metadata.
+    {{ gh }} release view v{{ semver }} | sed '/^--$/q'
+    # Expect exactly 3 assets attached to completed releases.
+    [[ {{ count-release-assets(semver) }} -eq 3 ]]
+    # TODO: add asset attestation
+    {{ gh }} release verify v{{ semver }} || true
+    # TODO: mark release as immutable
+    {{ just }} prepare-release-toot {{ semver }}
+    echo {{ read-release-url(semver) }}
 
 # Draft a Toot announcing a release.
 [group('release')]
