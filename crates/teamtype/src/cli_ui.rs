@@ -20,6 +20,11 @@ impl Interactions for ConsoleInteractions {
             .context("Failed to read answer to y/n prompt")
     }
 
+    fn prompt(&self, question: &str) -> Result<String> {
+        debug!("UI prompt event: {question}");
+        Ok(String::from("stub"))
+    }
+
     fn log(&self, message: &str) {
         let dimmed = Style::new().dimmed();
         debug!("UI log event: {message}");
@@ -35,5 +40,11 @@ impl Interactions for ConsoleInteractions {
         let yellow = Color::Yellow;
         debug!("UI warn event: {message}");
         eprintln!("{}", yellow.paint(message));
+    }
+
+    fn error(&self, message: &str) {
+        let red = Color::Red;
+        debug!("UI error event: {message}");
+        eprintln!("{}", red.paint(message));
     }
 }

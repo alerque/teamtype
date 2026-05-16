@@ -16,6 +16,9 @@ pub trait Interactions: Send + Sync {
     /// continuing.
     fn confirm(&self, question: &str) -> Result<bool>;
 
+    /// Ask the user to enter a text input value in response to a prompt question.
+    fn prompt(&self, question: &str) -> Result<String>;
+
     /// Log a message that is not essential to function and may only be seen if the user has
     /// verbose mode enabled or is watching a log file, but could be useful to keep track of what is
     /// going on.
@@ -33,4 +36,8 @@ pub trait Interactions: Send + Sync {
     /// Raise a warning message to the users attention in the event that something went sideways and
     /// may no longer be functioning as expected.
     fn warn(&self, message: &str);
+
+    /// Raise an error message to the users attention in the event that something went wrong enough
+    /// that the current action has been aborted.
+    fn error(&self, message: &str);
 }

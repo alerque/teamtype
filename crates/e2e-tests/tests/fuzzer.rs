@@ -58,12 +58,20 @@ impl Interactions for FuzzerInteractions {
         debug!(message);
     }
 
+    fn prompt(&self, _question: &str) -> Result<String> {
+        Ok(String::from("stub"))
+    }
+
     fn inform(&self, message: &str) {
         info!(message);
     }
 
     fn warn(&self, message: &str) {
         warn!(message);
+    }
+
+    fn error(&self, message: &str) {
+        error!(message);
     }
 }
 
