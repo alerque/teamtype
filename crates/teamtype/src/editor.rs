@@ -28,6 +28,7 @@ use crate::editor_protocol::{
     EditorProtocolMessageError, IncomingMessage, JSONRPCResponse, OutgoingMessage,
 };
 use crate::sandbox;
+use crate::types::UserInterface;
 
 pub type EditorId = usize;
 
@@ -99,6 +100,7 @@ pub(crate) fn strip_current_dir(path: &Path) -> PathBuf {
 pub fn spawn_socket_listener(
     socket_path: &Path,
     document_handle: DocumentActorHandle,
+    ui: &UserInterface,
 ) -> Result<()> {
     // Make sure the parent directory of the socket is only accessible by the current user.
     if let Err(description) = is_user_readable_only(socket_path) {
@@ -142,20 +144,32 @@ pub fn spawn_socket_listener(
     env::set_current_dir(previous_cwd)?;
     debug!("Listening on UNIX socket: {}", socket_path.display());
 
-    tokio::spawn(async move {
-        loop {
-            match listener.accept().await {
-                Ok((stream, _addr)) => {
-                    let id = document_handle.clone().next_editor_id();
-                    let document_handle_clone = document_handle.clone();
-                    tokio::spawn(async move {
-                        handle_editor_connection(stream, document_handle_clone.clone(), id).await;
-                    })
-                }
-                Err(err) => {
-                    panic!("Error while accepting socket connection: {err}");
-                }
-            };
+    tokio::spawn({
+        let ui = ui.clone();
+        async move {
+            loop {
+                match listener.accept().await {
+                    Ok((stream, _addr)) => {
+                        let id = document_handle.clone().next_editor_id();
+                        let document_handle_clone = document_handle.clone();
+                        tokio::spawn({
+                            let ui = ui.clone();
+                            async move {
+                                handle_editor_connection(
+                                    stream,
+                                    document_handle_clone.clone(),
+                                    id,
+                                    &ui,
+                                )
+                                .await;
+                            }
+                        })
+                    }
+                    Err(err) => {
+                        panic!("Error while accepting socket connection: {err}");
+                    }
+                };
+            }
         }
     });
 
@@ -166,6 +180,7 @@ async fn handle_editor_connection(
     stream: UnixStream,
     document_handle: DocumentActorHandle,
     editor_id: EditorId,
+    _ui: &UserInterface,
 ) {
     let (stream_read, stream_write) = tokio::io::split(stream);
     let mut reader = FramedRead::new(stream_read, IncomingProtocolCodec);

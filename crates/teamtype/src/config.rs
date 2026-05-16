@@ -17,6 +17,7 @@ use ini::{Ini, Properties};
 use tracing::info;
 
 use crate::sandbox;
+use crate::types::UserInterface;
 use crate::wormhole::get_secret_address_from_wormhole;
 
 pub const DOC_FILE: &str = "doc";
@@ -61,7 +62,7 @@ impl AppConfig {
     // - For strings, the CLI app config attribute has precedence.
     // - For booleans, if a value deviates from the default, it "wins".
     // - The `base_dir` will be taken from the CLI app config.
-    pub fn from_config_file_and_cli(app_config_cli: Self) -> Self {
+    pub fn from_config_file_and_cli(app_config_cli: Self, ui: &UserInterface) -> Self {
         let base_dir = app_config_cli.base_dir;
         let config_file = base_dir.join(CONFIG_DIR).join(CONFIG_FILE);
         let empty_properties_section = Properties::new();
@@ -76,7 +77,7 @@ impl AppConfig {
 
         // we do the computation of username before initializing the struct, because we need to
         // reference base_dir, which gets moved during the initialization of the struct
-        let username = get_username(app_config_cli.username, &base_dir, general_section);
+        let username = get_username(app_config_cli.username, &base_dir, general_section, ui);
         Self {
             // TODO: extract all the other fields to its own struct, s.t. we don't have to work
             // around the fact that base_dir won't ever be in the config file.
@@ -132,20 +133,21 @@ impl AppConfig {
     /// If we have a join code, try to use that and overwrite the config file.
     /// If we don't have a join code, try to use the configured peer.
     /// Otherwise, fail.
-    pub async fn resolve_peer(self) -> Result<Self> {
+    pub async fn resolve_peer(self, ui: &UserInterface) -> Result<Self> {
         let mut result = self.clone();
         let peer = match self.peer {
             Some(Peer::JoinCode(ref join_code)) => {
-                let secret_address =
-                    get_secret_address_from_wormhole(join_code, self.magic_wormhole_relay.clone())
-                        .await
-                        .context(
-                            "Failed to retrieve secret address, was this join code already used?",
-                        )?;
+                let secret_address = get_secret_address_from_wormhole(
+                    join_code,
+                    self.magic_wormhole_relay.clone(),
+                    ui,
+                )
+                .await
+                .context("Failed to retrieve secret address, was this join code already used?")?;
                 info!(
                     "Derived peer from join code. Storing in config (overwriting previous config)."
                 );
-                store_peer_in_config(&self.base_dir, &self.config_file(), &secret_address)?;
+                store_peer_in_config(&self.base_dir, &self.config_file(), &secret_address, ui)?;
                 Peer::SecretAddress(secret_address)
             }
             Some(Peer::SecretAddress(secret_address)) => {
@@ -166,7 +168,12 @@ impl AppConfig {
     }
 }
 
-pub fn store_peer_in_config(directory: &Path, config_file: &Path, peer: &str) -> Result<()> {
+pub fn store_peer_in_config(
+    directory: &Path,
+    config_file: &Path,
+    peer: &str,
+    _ui: &UserInterface,
+) -> Result<()> {
     info!("Storing peer's address in .teamtype/config.");
 
     let content = format!("peer={peer}\n");
@@ -212,20 +219,24 @@ fn get_username(
     app_config_cli_username: Option<String>,
     base_dir: &Path,
     general_section: &Properties,
+    ui: &UserInterface,
 ) -> String {
     app_config_cli_username
-        .map(get_username_from_cli)
-        .or_else(|| get_username_from_config_file(general_section))
-        .or_else(|| get_username_from_git(base_dir))
-        .unwrap_or_else(get_username_from_fallback_value)
+        .map(|u| get_username_from_cli(u, ui))
+        .or_else(|| get_username_from_config_file(general_section, ui))
+        .or_else(|| get_username_from_git(base_dir, ui))
+        .unwrap_or_else(|| get_username_from_fallback_value(ui))
 }
 
-fn get_username_from_cli(username: String) -> String {
+fn get_username_from_cli(username: String, _ui: &UserInterface) -> String {
     info!("Using the username '{username}' to display next to the cursors other people see.");
     username
 }
 
-fn get_username_from_config_file(general_section: &Properties) -> Option<String> {
+fn get_username_from_config_file(
+    general_section: &Properties,
+    _ui: &UserInterface,
+) -> Option<String> {
     general_section
         .get("username")
         .map(ToString::to_string)
@@ -235,7 +246,7 @@ fn get_username_from_config_file(general_section: &Properties) -> Option<String>
         })
 }
 
-fn get_username_from_git(base_dir: &Path) -> Option<String> {
+fn get_username_from_git(base_dir: &Path, _ui: &UserInterface) -> Option<String> {
     let username = get_git_username(base_dir);
     if let Some(ref username) = username {
         info!(
@@ -251,7 +262,7 @@ fn get_username_from_git(base_dir: &Path) -> Option<String> {
     username
 }
 
-fn get_username_from_fallback_value() -> String {
+fn get_username_from_fallback_value(_ui: &UserInterface) -> String {
     let username = USERNAME_FALLBACK.to_string();
     info!(
         "{}",

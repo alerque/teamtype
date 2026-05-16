@@ -41,6 +41,7 @@ use crate::editor_protocol::{
 use crate::path::{AbsolutePath, RelativePath};
 use crate::peer;
 use crate::sandbox;
+use crate::types::UserInterface;
 use crate::types::{
     ComponentMessage, CursorId, CursorState, EphemeralMessage, FileTextDelta, PatchEffect,
     TextDelta,
@@ -116,15 +117,18 @@ pub struct DocumentActor {
     /// The Document is the main I/O managed resource of this actor.
     crdt_doc: Document,
     app_config: AppConfig,
+    _ui: UserInterface,
     save_fully: bool,
 }
 
 impl DocumentActor {
+    #[expect(clippy::too_many_arguments)]
     fn new(
         doc_message_rx: mpsc::Receiver<DocMessage>,
         doc_changed_ping_tx: DocChangedSender,
         ephemeral_message_tx: EphemeralMessageSender,
         app_config: AppConfig,
+        ui: &UserInterface,
         init: bool,
         is_host: bool,
         persist: bool,
@@ -143,9 +147,9 @@ impl DocumentActor {
             );
             let bytes = sandbox::read_file(&app_config.base_dir, &persistence_file)
                 .unwrap_or_else(|_| panic!("Could not read file '{}'", persistence_file.display()));
-            Document::load(&bytes)
+            Document::load(&bytes, ui)
         } else {
-            Document::default()
+            Document::new(ui)
         };
         debug!("Loading CRDT document completed.");
 
@@ -156,6 +160,7 @@ impl DocumentActor {
             editor_connections: HashMap::default(),
             ephemeral_states: HashMap::default(),
             app_config,
+            _ui: ui.clone(),
             crdt_doc,
             save_fully: true,
         };
@@ -869,7 +874,13 @@ pub struct DocumentActorHandle {
 }
 
 impl DocumentActorHandle {
-    pub fn new(app_config: &AppConfig, init: bool, is_host: bool, persist: bool) -> Self {
+    pub fn new(
+        app_config: &AppConfig,
+        ui: &UserInterface,
+        init: bool,
+        is_host: bool,
+        persist: bool,
+    ) -> Self {
         // The document task will receive messages on this channel.
         let (doc_message_tx, doc_message_rx) = mpsc::channel(1);
 
@@ -886,6 +897,7 @@ impl DocumentActorHandle {
             doc_changed_ping_tx.clone(),
             ephemeral_message_tx.clone(),
             app_config.clone(),
+            ui,
             init,
             is_host,
             persist,
@@ -954,10 +966,15 @@ pub struct Daemon {
 
 impl Daemon {
     // Launch the daemon. Optionally, connect to given peer.
-    pub async fn new(app_config: AppConfig, init: bool, persist: bool) -> Result<Self> {
+    pub async fn new(
+        app_config: AppConfig,
+        init: bool,
+        persist: bool,
+        ui: &UserInterface,
+    ) -> Result<Self> {
         let is_host = app_config.is_host();
 
-        let document_handle = DocumentActorHandle::new(&app_config, init, is_host, persist);
+        let document_handle = DocumentActorHandle::new(&app_config, ui, init, is_host, persist);
 
         let base_dir = &app_config.base_dir;
 
@@ -965,7 +982,7 @@ impl Daemon {
         let socket_path = base_dir
             .join(config::CONFIG_DIR)
             .join(config::DEFAULT_SOCKET_NAME);
-        editor::spawn_socket_listener(&socket_path, document_handle.clone())?;
+        editor::spawn_socket_listener(&socket_path, document_handle.clone(), ui)?;
 
         // Start file watcher.
         spawn_file_watcher(&app_config, document_handle.clone());
@@ -977,7 +994,7 @@ impl Daemon {
 
         // Start connection manager.
         let connection_manager =
-            peer::ConnectionManager::new(&app_config, document_handle.clone(), base_dir)
+            peer::ConnectionManager::new(&app_config, document_handle.clone(), base_dir, ui)
                 .await
                 .expect("Failed to start connection manager");
         let address = connection_manager.secret_address();
@@ -994,7 +1011,7 @@ impl Daemon {
             );
         }
         if app_config.emit_join_code {
-            put_secret_address_into_wormhole(address, app_config.magic_wormhole_relay.clone())
+            put_secret_address_into_wormhole(address, app_config.magic_wormhole_relay.clone(), ui)
                 .await;
         }
         if let Some(config::Peer::SecretAddress(ref secret_address)) = app_config.peer {
@@ -1098,7 +1115,7 @@ fn spawn_persister(document_handle: DocumentActorHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    //use crate::types::factories::*;
+    use crate::testing::TestInteractions;
 
     mod document_actor {
         use tempfile::{TempDir, tempdir};
@@ -1120,6 +1137,8 @@ mod tests {
                 let (ephemeral_message_tx, _ephemeral_message_rx) =
                     broadcast::channel::<EphemeralMessage>(100);
 
+                let ui = &UserInterface::new(TestInteractions {});
+
                 Self::new(
                     doc_message_rx,
                     doc_changed_ping_tx,
@@ -1128,6 +1147,7 @@ mod tests {
                         base_dir: directory.path().to_path_buf(),
                         ..Default::default()
                     },
+                    ui,
                     true,
                     true,
                     false,

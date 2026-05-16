@@ -60,7 +60,7 @@ async fn main() -> Result<()> {
 
     logging::initialize()?;
 
-    let _ui = &UserInterface::new(FuzzerInteractions {});
+    let ui = &UserInterface::new(FuzzerInteractions {});
 
     // Set up files in shared directories. The directories will get cleaned up automatically when
     // the handle goes out of scope. We don't *use* the handle but we do need to keep it in scope.
@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
     // Set up the actors.
     let mut app_config = AppConfig::default();
     app_config.base_dir = dir1;
-    let daemon = Daemon::new(app_config, true, false).await?;
+    let daemon = Daemon::new(app_config, true, false, ui).await?;
 
     // Wait until iroh's DNS discovery (hopefully) works.
     sleep(Duration::from_millis(1000)).await;
@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
     let mut app_config2 = AppConfig::default();
     app_config2.base_dir = dir2;
     app_config2.peer = Some(config::Peer::SecretAddress(daemon.address.clone()));
-    let peer = Daemon::new(app_config2, false, false).await?;
+    let peer = Daemon::new(app_config2, false, false, ui).await?;
 
     // Wait until file2 appears.
     while !file2.exists() {
