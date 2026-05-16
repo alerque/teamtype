@@ -38,7 +38,7 @@ crate-type = ["rlib", "cdylib"]
 [features]
 # This is unfortunate, but users of the crate as a library should use `default-features = false`.
 default = ["cli"]
-cli = ["dep:clap", "tokio/signal", "tokio/rt-multi-thread"]
+cli = ["dep:clap", "dep:inquire", "tokio/signal", "tokio/rt-multi-thread"]
 
 [build-dependencies]
 anyhow.workspace = true
@@ -90,6 +90,10 @@ features = ["as_ref", "deref", "display"]
 [dependencies.git2]
 version = "0.21"
 default-features = false
+
+[dependencies.inquire]
+version = "0.9"
+optional = true
 
 [dependencies.notify]
 version = "8"
