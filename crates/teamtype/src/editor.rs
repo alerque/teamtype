@@ -21,7 +21,7 @@ use tokio_util::{
     bytes::BytesMut,
     codec::{Decoder, Encoder, FramedRead, FramedWrite, LinesCodec},
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info};
 
 use crate::daemon::{DocMessage, DocumentActorHandle};
 use crate::editor_protocol::{
@@ -120,7 +120,7 @@ pub fn spawn_socket_listener(
                 "Detected an existing daemon running for this directory. Rejecting to start another one."
             );
         }
-        warn!(
+        ui.warn(
             "An existing socket was found for this directory, but since the daemon seems to be defunct it is being removed."
         );
         sandbox::remove_file(Path::new("/"), socket_path).expect("Could not remove socket");
@@ -207,7 +207,7 @@ async fn handle_editor_connection(
                         data: None,
                     },
                 };
-                error!("Error for JSON-RPC request: {:?}", response);
+                ui.warn(&format!("Error for JSON-RPC request: {response:?}"));
                 let message = OutgoingMessage::Response(response);
                 document_handle
                     .send_message(DocMessage::ToEditor(editor_id, message))

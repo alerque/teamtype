@@ -23,7 +23,7 @@ use teamtype::{
 };
 use tempfile::{TempDir, tempdir_in};
 use tokio::signal;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use self::cli::{Cli, Commands, ShareJoinFlags};
 
@@ -104,7 +104,7 @@ async fn run_daemon(app_config: AppConfig, init_doc: bool, ui: &UserInterface) -
     config::ensure_teamtype_is_ignored(&app_config.base_dir)?;
 
     if app_config.sync_vcs && config::has_local_user_config(&app_config.base_dir).is_ok_and(|v| v) {
-        warn!(docstr!(
+        ui.warn(docstr!(
             /// You have a local user configuration in your .git/config.
             /// In --sync-vcs mode, this file will also be synchronized between peers.
             /// If your version "wins", all peers will have the same Git identity.
@@ -211,7 +211,7 @@ async fn run_client(directory: PathBuf) -> Result<()> {
         .context("JSON-RPC forwarder failed")
 }
 
-async fn trap_shutdown(_ui: &UserInterface) {
+async fn trap_shutdown(ui: &UserInterface) {
     let interruption = async {
         signal::ctrl_c()
             .await
@@ -231,10 +231,10 @@ async fn trap_shutdown(_ui: &UserInterface) {
 
     tokio::select! {
         () = interruption => {
-            info!("Got SIGINT (Ctrl+C), shutting down");
+            ui.inform("Got SIGINT (Ctrl+C), shutting down");
         }
         () = termination => {
-            info!("Got SIGTERM, shutting down");
+            ui.inform("Got SIGTERM, shutting down");
         }
     }
 }
@@ -315,13 +315,11 @@ fn setup_teamtype_directory(
     if has_ethersync_directory(directory) {
         let old_directory = directory.join(config::LEGACY_CONFIG_DIR);
 
-        warn!(
-            "You have an '{}/' directory, back from when the project was called \"Ethersync\" until October 2025.",
-            &old_directory.display()
-        );
-
-        if ui.confirm(&format!(
-            "Do you want to rename {}/ to {}/?",
+        if ui.confirm(&docstr!(format!
+            /// You have an '{}/' directory, back from when the project was called \"Ethersync\" until October 2025.
+            ///
+            /// Do you want to rename {}/ to {}/?
+            config::LEGACY_CONFIG_DIR,
             config::LEGACY_CONFIG_DIR,
             config::CONFIG_DIR,
         ))? {
@@ -343,21 +341,17 @@ fn setup_teamtype_directory(
                 &directory.display()
             );
             sandbox::create_dir(directory, &teamtype_dir)?;
+        } else if ui.confirm(&docstr!(format!
+            /// '{}' hasn't been used as a Teamtype directory before.
+            ///
+            /// Do you want to enable live collaboration here? (This will create an {}/ directory.)
+            directory.display(),
+            config::CONFIG_DIR
+        ))? {
+            sandbox::create_dir(directory, &teamtype_dir)?;
+            info!("Created! Resuming launch.");
         } else {
-            warn!(
-                "'{}' hasn't been used as a Teamtype directory before.",
-                &directory.display()
-            );
-
-            if ui.confirm(&format!(
-                "Do you want to enable live collaboration here? (This will create an {}/ directory.)",
-                config::CONFIG_DIR
-            ))? {
-                sandbox::create_dir(directory, &teamtype_dir)?;
-                info!("Created! Resuming launch.");
-            } else {
-                bail!("Aborting launch. Teamtype needs a .teamtype/ directory to function");
-            }
+            bail!("Aborting launch. Teamtype needs a .teamtype/ directory to function");
         }
     }
     Ok(())

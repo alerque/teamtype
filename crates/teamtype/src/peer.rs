@@ -25,7 +25,7 @@ use iroh::{Endpoint, EndpointAddr, PublicKey, RelayMap, RelayUrl, SecretKey};
 use postcard::{from_bytes, to_allocvec};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::sleep;
-use tracing::{debug, info, warn};
+use tracing::debug;
 use url::Url;
 
 use self::sync::{Connection, PeerMessage, SyncActor};
@@ -296,7 +296,7 @@ impl EndpointActor {
                 };
 
                 let endpoint_id = conn.remote_id();
-                info!("Connected to peer: {endpoint_id}");
+                self.ui.inform(&format!("Connected to peer: {endpoint_id}"));
 
                 if let Some(response_tx) = response_tx {
                     response_tx.send(Ok(())).expect("Connect receiver dropped");
@@ -330,12 +330,14 @@ impl EndpointActor {
         message_tx: mpsc::Sender<EndpointMessage>,
         secret_address: SecretAddress,
         previous_attempts: usize,
-        _ui: &UserInterface,
+        ui: &UserInterface,
     ) -> Result<()> {
         // Only log at "info" level if this is the first reconnection attempt.
         let endpoint_id = secret_address.endpoint_addr.id;
         if previous_attempts == 0 {
-            info!("Connection to peer {endpoint_id} lost, will keep trying to reconnect...");
+            ui.inform(&format!(
+                "Connection to peer {endpoint_id} lost, will keep trying to reconnect..."
+            ));
         } else {
             sleep(Duration::from_secs(10)).await;
             debug!("Making another attempt to connect to peer {endpoint_id}...");
@@ -390,12 +392,12 @@ impl EndpointActor {
     fn handle_incoming_connection(&self, conn: IrohEndpointConnection) {
         let endpoint_id = conn.remote_id();
 
-        info!("Peer connected: {}", &endpoint_id);
+        self.ui.inform(&format!("Peer connected: {endpoint_id}"));
 
         let my_passphrase_clone = self.my_passphrase.clone();
         let document_handle_clone = self.document_handle.clone();
         tokio::spawn({
-            let _ui = self.ui.clone();
+            let ui = self.ui.clone();
             async move {
                 if let Err(err) = Self::handle_peer(
                     document_handle_clone,
@@ -404,10 +406,9 @@ impl EndpointActor {
                 )
                 .await
                 {
-                    warn!("Incoming connection failed: {err}");
+                    ui.warn(&format!("Incoming connection failed: {err}"));
                 }
-
-                info!("Peer disconnected: {endpoint_id}",);
+                ui.inform(&format!("Peer disconnected: {endpoint_id}"));
             }
         });
     }
