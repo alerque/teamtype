@@ -28,7 +28,7 @@ use tokio::{
     time::sleep,
     time::{Duration, Instant},
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info};
 
 use crate::config::{self, AppConfig};
 use crate::document::{self, Document};
@@ -117,7 +117,7 @@ pub struct DocumentActor {
     /// The Document is the main I/O managed resource of this actor.
     crdt_doc: Document,
     app_config: AppConfig,
-    _ui: UserInterface,
+    ui: UserInterface,
     save_fully: bool,
 }
 
@@ -160,7 +160,7 @@ impl DocumentActor {
             editor_connections: HashMap::default(),
             ephemeral_states: HashMap::default(),
             app_config,
-            _ui: ui.clone(),
+            ui: ui.clone(),
             crdt_doc,
             save_fully: true,
         };
@@ -260,7 +260,8 @@ impl DocumentActor {
                                     &self.absolute_path_for_file_path(&file_path),
                                 )
                                 .unwrap_or_else(|err| {
-                                    warn!("Failed to remove file {file_path}: {err}");
+                                    self.ui
+                                        .warn(&format!("Failed to remove file {file_path}: {err}"));
                                 });
                             } else {
                                 // At least one editor has the file open. We want to allow it to
@@ -321,7 +322,8 @@ impl DocumentActor {
                 }
 
                 if response_tx.send(peer_state).is_err() {
-                    warn!("Failed to send peer state in response to ReceiveSyncMessage.");
+                    self.ui
+                        .warn("Failed to send peer state in response to ReceiveSyncMessage.");
                 }
             }
             DocMessage::GenerateSyncMessage {
@@ -331,7 +333,7 @@ impl DocumentActor {
                 let message = self.crdt_doc.generate_sync_message(&mut peer_state);
 
                 if response_tx.send((peer_state, message)).is_err() {
-                    warn!(
+                    self.ui.warn(
                         "Failed to send peer state and sync message in response to GenerateSyncMessage."
                     );
                 }
@@ -416,7 +418,8 @@ impl DocumentActor {
                 let result = self.react_to_message_from_editor(editor_id, &payload).await;
                 match result {
                     Err(error) => {
-                        error!("Error for JSON-RPC request: {:?}", error);
+                        self.ui
+                            .warn(&format!("Error for JSON-RPC request: {error:?}"));
                         self.send_to_editor_client(
                             &editor_id,
                             OutgoingMessage::Response(JSONRPCResponse::RequestError {
@@ -481,10 +484,10 @@ impl DocumentActor {
         let new_content = match sandbox::read_file(&self.app_config.base_dir, &file_path) {
             Ok(content) => content,
             Err(e) => {
-                warn!(
+                self.ui.warn(&format!(
                     "The file watcher noticed a file creation/change for {relative_file_path}, \
                     but we couldn't read it: {e} (probably it was deleted after the change?)"
-                );
+                ));
                 return;
             }
         };
@@ -555,7 +558,9 @@ impl DocumentActor {
             .expect("Could not get editor handle");
 
         connection.1.send(message).await.unwrap_or_else(|err| {
-            error!("Failed to send message to editor: {err} Removing editor.");
+            self.ui.warn(&format!(
+                "Failed to send message to editor: {err} Removing editor."
+            ));
             self.editor_connections.remove(editor_id);
         });
     }
@@ -578,9 +583,9 @@ impl DocumentActor {
             let bytes = text.as_bytes();
             self.ensure_file_has_bytes(file_path, bytes);
         } else {
-            warn!(
+            self.ui.warn(&format!(
                 "Failed to get content of file '{file_path}' when writing to disk. Key should have existed?"
-            );
+            ));
         }
     }
 
@@ -639,7 +644,10 @@ impl DocumentActor {
                     }
                 }
                 Err(e) => {
-                    warn!("Failed to read file '{}': {e}", file_path.display());
+                    self.ui.warn(&format!(
+                        "Failed to read file '{}': {e}",
+                        file_path.display()
+                    ));
                 }
             }
         }
@@ -652,9 +660,9 @@ impl DocumentActor {
                 )
                 && self.owns(&relative_file_path)
             {
-                warn!(
+                self.ui.warn(&format!(
                         "File {relative_file_path} exists in the CRDT, but not on disk. Deleting from CRDT."
-                    );
+                    ));
                 self.remove_file(&relative_file_path);
             }
         }
@@ -1000,15 +1008,12 @@ impl Daemon {
         let address = connection_manager.secret_address();
 
         if app_config.emit_secret_address {
-            info!(
-                "{}",
-                &docstr!(format!
-                    /// Others can connect by putting the following secret address in their .teamtype/config:
-                    ///
-                    ///     peer={address}
-                    ///
-                )
-            );
+            ui.inform(&docstr!(format!
+                /// Others can connect by putting the following secret address in their .teamtype/config:
+                ///
+                ///     peer={address}
+                ///
+            ));
         }
         if app_config.emit_join_code {
             put_secret_address_into_wormhole(address, app_config.magic_wormhole_relay.clone(), ui)
