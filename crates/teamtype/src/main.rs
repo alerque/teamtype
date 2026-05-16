@@ -65,11 +65,11 @@ async fn main() -> Result<()> {
 
     logging::initialize().context("Failed to initialize logging")?;
 
-    let _ui = &UserInterface::new(ConsoleInteractions {});
+    let ui = &UserInterface::new(ConsoleInteractions {});
 
     let temporary_directory = get_temporary_directory(&cli)?;
     let directory = get_directory(temporary_directory.as_ref(), &cli)?;
-    setup_teamtype_directory(&directory, temporary_directory.as_ref())
+    setup_teamtype_directory(&directory, temporary_directory.as_ref(), ui)
         .context("Failed to find .teamtype/ directory")?;
 
     // TODO: If the result of this joined future handles were to go out of scope and hence be
@@ -80,21 +80,21 @@ async fn main() -> Result<()> {
     let _handle = match cli.command {
         Commands::Client => return run_client(directory.clone()).await,
         Commands::Join { .. } => {
-            let join_config = parse_join_config(cli.command, directory.clone()).await?;
-            run_daemon(join_config, false).await
+            let join_config = parse_join_config(cli.command, directory.clone(), ui).await?;
+            run_daemon(join_config, false, ui).await
         }
         Commands::Share { init, .. } => {
-            let share_config = parse_share_config(cli.command, directory.clone());
-            run_daemon(share_config, init).await
+            let share_config = parse_share_config(cli.command, directory.clone(), ui);
+            run_daemon(share_config, init, ui).await
         }
     }?;
 
-    trap_shutdown().await;
+    trap_shutdown(ui).await;
 
     Ok(())
 }
 
-async fn run_daemon(app_config: AppConfig, init_doc: bool) -> Result<Daemon> {
+async fn run_daemon(app_config: AppConfig, init_doc: bool, ui: &UserInterface) -> Result<Daemon> {
     let persist = !config::has_git_remote(&app_config.base_dir);
     if !persist {
         // TODO: drop .teamtype/doc here? Would that be rude?
@@ -119,12 +119,16 @@ async fn run_daemon(app_config: AppConfig, init_doc: bool) -> Result<Daemon> {
     // Setup a new daemon from the derived config. Immediately join the handle because that's what
     // actually starts the local socket and any configured network connections. Return the result
     // so the calling context can determine when to terminate.
-    Daemon::new(app_config, init_doc, persist)
+    Daemon::new(app_config, init_doc, persist, ui)
         .await
         .context("Failed to launch the daemon")
 }
 
-async fn parse_join_config(command: Commands, directory: PathBuf) -> Result<AppConfig> {
+async fn parse_join_config(
+    command: Commands,
+    directory: PathBuf,
+    ui: &UserInterface,
+) -> Result<AppConfig> {
     if let Commands::Join {
         join_code,
         shared_flags:
@@ -152,9 +156,9 @@ async fn parse_join_config(command: Commands, directory: PathBuf) -> Result<AppC
             sync_vcs,
             username,
         };
-        let mut app_config = AppConfig::from_config_file_and_cli(app_config_cli);
+        let mut app_config = AppConfig::from_config_file_and_cli(app_config_cli, ui);
         app_config = app_config
-            .resolve_peer()
+            .resolve_peer(ui)
             .await
             .context("Failed to resolve peer")?;
         Ok(app_config)
@@ -163,7 +167,7 @@ async fn parse_join_config(command: Commands, directory: PathBuf) -> Result<AppC
     }
 }
 
-fn parse_share_config(command: Commands, directory: PathBuf) -> AppConfig {
+fn parse_share_config(command: Commands, directory: PathBuf, ui: &UserInterface) -> AppConfig {
     if let Commands::Share {
         no_join_code,
         shared_flags:
@@ -192,7 +196,7 @@ fn parse_share_config(command: Commands, directory: PathBuf) -> AppConfig {
             sync_vcs,
             username,
         };
-        let mut app_config = AppConfig::from_config_file_and_cli(app_config_cli);
+        let mut app_config = AppConfig::from_config_file_and_cli(app_config_cli, ui);
         // Because of the "share" subcommand, explicitly don't connect anywhere.
         app_config.peer = None;
         app_config
@@ -209,7 +213,7 @@ async fn run_client(directory: PathBuf) -> Result<()> {
         .context("JSON-RPC forwarder failed")
 }
 
-async fn trap_shutdown() {
+async fn trap_shutdown(_ui: &UserInterface) {
     let interruption = async {
         signal::ctrl_c()
             .await
@@ -305,7 +309,11 @@ fn get_directory(temporary_directory: Option<&TempDir>, cli: &Cli) -> Result<Pat
     Ok(directory)
 }
 
-fn setup_teamtype_directory(directory: &Path, temporary_directory: Option<&TempDir>) -> Result<()> {
+fn setup_teamtype_directory(
+    directory: &Path,
+    temporary_directory: Option<&TempDir>,
+    _ui: &UserInterface,
+) -> Result<()> {
     if has_ethersync_directory(directory) {
         let old_directory = directory.join(config::LEGACY_CONFIG_DIR);
 

@@ -17,10 +17,8 @@ use automerge::{
 use dissimilar::Chunk;
 use tracing::{debug, info};
 
-use crate::{
-    path::RelativePath,
-    types::{EditorTextDelta, PatchEffect, TextDelta},
-};
+use crate::path::RelativePath;
+use crate::types::{EditorTextDelta, PatchEffect, TextDelta, UserInterface};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Content {
@@ -41,28 +39,28 @@ pub enum Content {
 pub struct Document {
     files: HashMap<RelativePath, Content>,
     doc: AutoCommit,
+    _ui: UserInterface,
 }
 
-impl Default for Document {
-    fn default() -> Self {
+impl Document {
+    pub fn new(ui: &UserInterface) -> Self {
         // We're baking a single static initial state into the binary rather than generating new documents
         // from a random seed in each client so that documents created by independent peers can be merged.
         // See build.rs for how to force a rebuild of this initial state, but be aware updating the initial
         // state is a breaking change that will make Teamtype peers incompatible with each other.
         // See https://automerge.org/docs/cookbook/modeling-data/#setting-up-an-initial-document-structure
         let initial_automerge_doc_bytes = include_bytes!("initial_automerge_doc.bin");
-        Self::load(initial_automerge_doc_bytes)
+        Self::load(initial_automerge_doc_bytes, ui)
     }
-}
 
-impl Document {
     // TODO: use sth like try_load + Result to bubble up potential errors.
-    pub fn load(bytes: &[u8]) -> Self {
+    pub fn load(bytes: &[u8], ui: &UserInterface) -> Self {
         let doc =
             AutoCommit::load(bytes).expect("Failed to load Automerge document from given bytes");
         let mut result = Self {
             files: HashMap::default(),
             doc,
+            _ui: ui.clone(),
         };
         result.update_files();
         result
@@ -416,6 +414,7 @@ impl Document {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::TestInteractions;
     use crate::types::factories::*;
 
     impl Document {
@@ -429,7 +428,8 @@ mod tests {
 
     #[test]
     fn can_initialize_content() {
-        let mut document = Document::default();
+        let ui = &UserInterface::new(TestInteractions {});
+        let mut document = Document::new(ui);
         let text = "To be or not to be, that is the question";
         let file = RelativePath::new("text");
 
@@ -440,7 +440,8 @@ mod tests {
 
     #[test]
     fn can_initialize_content_multifile() {
-        let mut document = Document::default();
+        let ui = &UserInterface::new(TestInteractions {});
+        let mut document = Document::new(ui);
 
         let text = "To be or not to be, that is the question";
         let text2 = "2b||!2b, that is the question";
@@ -457,7 +458,8 @@ mod tests {
 
     #[test]
     fn retrieve_content_file_nonexistent_errs() {
-        let document = Document::default();
+        let ui = &UserInterface::new(TestInteractions {});
+        let document = Document::new(ui);
         assert!(
             document
                 .current_file_content(&RelativePath::new("text"))
@@ -466,7 +468,8 @@ mod tests {
     }
 
     fn apply_delta_to_doc_works(initial: &str, delta: &TextDelta, expected: &str) {
-        let mut document = Document::default();
+        let ui = &UserInterface::new(TestInteractions {});
+        let mut document = Document::new(ui);
         let file = RelativePath::new("text");
 
         document.set_file(Content::String(initial.to_string()), &file);
@@ -514,7 +517,8 @@ mod tests {
 
     #[test]
     fn apply_delta_only_changes_specified_file() {
-        let mut document = Document::default();
+        let ui = &UserInterface::new(TestInteractions {});
+        let mut document = Document::new(ui);
 
         let file1 = RelativePath::new("text");
         let file2 = RelativePath::new("text2");
@@ -536,7 +540,8 @@ mod tests {
 
         #[test]
         fn test_generate_sync_message() {
-            let mut document = Document::default();
+            let ui = &UserInterface::new(TestInteractions {});
+            let mut document = Document::new(ui);
             let mut state = AutomergeSyncState::new();
             assert!(document.generate_sync_message(&mut state).is_some());
             // Stops for now and waits for a response
