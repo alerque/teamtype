@@ -5,8 +5,6 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use std::io::Write;
-use std::io::{stdin, stdout};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::{env, panic};
@@ -312,7 +310,7 @@ fn get_directory(temporary_directory: Option<&TempDir>, cli: &Cli) -> Result<Pat
 fn setup_teamtype_directory(
     directory: &Path,
     temporary_directory: Option<&TempDir>,
-    _ui: &UserInterface,
+    ui: &UserInterface,
 ) -> Result<()> {
     if has_ethersync_directory(directory) {
         let old_directory = directory.join(config::LEGACY_CONFIG_DIR);
@@ -322,7 +320,7 @@ fn setup_teamtype_directory(
             &old_directory.display()
         );
 
-        if prompt_bool(&format!(
+        if ui.confirm(&format!(
             "Do you want to rename {}/ to {}/?",
             config::LEGACY_CONFIG_DIR,
             config::CONFIG_DIR,
@@ -351,7 +349,7 @@ fn setup_teamtype_directory(
                 &directory.display()
             );
 
-            if prompt_bool(&format!(
+            if ui.confirm(&format!(
                 "Do you want to enable live collaboration here? (This will create an {}/ directory.)",
                 config::CONFIG_DIR
             ))? {
@@ -367,18 +365,4 @@ fn setup_teamtype_directory(
 
 fn get_current_directory() -> Result<PathBuf> {
     env::current_dir().context("Could not access current directory")
-}
-
-fn prompt_bool(question: &str) -> Result<bool> {
-    print!("{question} (y/N): ");
-    stdout().flush()?;
-    let mut lines = stdin().lines();
-    if let Some(Ok(line)) = lines.next() {
-        match line.to_lowercase().as_str() {
-            "y" | "yes" => Ok(true),
-            _ => Ok(false),
-        }
-    } else {
-        bail!("Failed to read answer");
-    }
 }
