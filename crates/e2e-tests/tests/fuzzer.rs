@@ -20,7 +20,7 @@ use teamtype::traits::Interactions;
 use teamtype::types::UserInterface;
 use tempfile::{TempDir, tempdir};
 use tokio::time::{Duration, sleep, timeout};
-use tracing::{debug, error, info};
+use tracing::{debug, info, warn};
 
 async fn perform_random_edits(actor: &mut (impl Actor + ?Sized)) {
     for _ in 1..500 {
@@ -52,6 +52,14 @@ impl Interactions for FuzzerInteractions {
     fn confirm(&self, question: &str) -> Result<bool> {
         debug!("Fuzzer asked for a confirmation '{question}', answering with 'false'");
         Ok(false)
+    }
+
+    fn inform(&self, message: &str) {
+        info!(message);
+    }
+
+    fn warn(&self, message: &str) {
+        warn!(message);
     }
 }
 
@@ -139,7 +147,7 @@ async fn main() -> Result<()> {
     })
     .await
     .unwrap_or_else(|_| {
-        error!("Timeout while waiting for all contents to be equal");
+        ui.warn("Timeout while waiting for all contents to be equal");
     });
 
     // Get all contents.
