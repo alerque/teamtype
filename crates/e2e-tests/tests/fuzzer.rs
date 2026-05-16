@@ -16,6 +16,8 @@ use teamtype::config::{self, AppConfig};
 use teamtype::daemon::{Daemon, TEST_FILE_PATH};
 use teamtype::logging;
 use teamtype::sandbox;
+use teamtype::traits::Interactions;
+use teamtype::types::UserInterface;
 use tempfile::{TempDir, tempdir};
 use tokio::time::{Duration, sleep, timeout};
 use tracing::{error, info};
@@ -44,6 +46,10 @@ fn initialize_directory() -> (TempDir, PathBuf, PathBuf) {
     (dir, dir_path.to_path_buf(), file)
 }
 
+struct FuzzerInteractions {}
+
+impl Interactions for FuzzerInteractions {}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let default_panic = std::panic::take_hook();
@@ -53,6 +59,8 @@ async fn main() -> Result<()> {
     }));
 
     logging::initialize()?;
+
+    let _ui = &UserInterface::new(FuzzerInteractions {});
 
     // Set up files in shared directories. The directories will get cleaned up automatically when
     // the handle goes out of scope. We don't *use* the handle but we do need to keep it in scope.

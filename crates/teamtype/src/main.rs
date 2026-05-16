@@ -17,6 +17,7 @@ use clap::{CommandFactory as _, FromArgMatches as _};
 use docstr::docstr;
 use microxdg::XdgApp;
 use teamtype::jsonrpc_forwarder::{JSONRPCForwarder, UnixJSONRPCForwarder};
+use teamtype::types::UserInterface;
 use teamtype::{
     config::{self, AppConfig},
     daemon::Daemon,
@@ -29,6 +30,9 @@ use tracing::{debug, info, warn};
 use self::cli::{Cli, Commands, ShareJoinFlags};
 
 mod cli;
+mod cli_ui;
+
+use cli_ui::ConsoleInteractions;
 
 fn has_ethersync_directory(dir: &Path) -> bool {
     let ethersync_dir = dir.join(config::LEGACY_CONFIG_DIR);
@@ -60,6 +64,8 @@ async fn main() -> Result<()> {
     };
 
     logging::initialize().context("Failed to initialize logging")?;
+
+    let _ui = &UserInterface::new(ConsoleInteractions {});
 
     let temporary_directory = get_temporary_directory(&cli)?;
     let directory = get_directory(temporary_directory.as_ref(), &cli)?;
