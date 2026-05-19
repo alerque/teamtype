@@ -6,6 +6,7 @@ cargo := require('cargo')
 cargo-deny := require('cargo-deny')
 just := just_executable()
 luacheck := require('luacheck')
+nvim := require('nvim')
 reuse := require('reuse')
 stylua := require('stylua')
 typos := require('typos')
@@ -87,3 +88,14 @@ fuzz:
 # Do all the things: check, lint, test, and fuzz
 [parallel]
 perfect: check lint test fuzz
+
+# This task will run Neovim with factory settings and a development version of the plug-in. This is especially
+# useful for manual testing of shared directories and can be used from anywhere by invoking the Justfile externally,
+# e.g. with an alias such as `alias nvim='just --justfile path/to/teamtype/Justfile nvim'`.
+# Can be used to test the Neovim plug-in from outside the project.
+[no-cd]
+nvim *ARGS:
+    {{ nvim }} --clean \
+        -c {{ quote("let &runtimepath=\"" + justfile_directory() + "/nvim-plugin,\" . &runtimepath") }} \
+        -c 'runtime plugin/teamtype.lua' \
+        {{ ARGS }}
