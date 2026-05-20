@@ -15,8 +15,8 @@ use tokio::{
 };
 
 pub struct MockSocket {
-    writer_tx: tokio::sync::mpsc::Sender<String>,
-    reader_rx: tokio::sync::mpsc::Receiver<String>,
+    writer_tx: mpsc::Sender<String>,
+    reader_rx: mpsc::Receiver<String>,
 }
 
 impl MockSocket {
@@ -70,7 +70,7 @@ impl MockSocket {
         }
     }
 
-    pub async fn send(&mut self, message: &str) {
+    pub async fn send(&self, message: &str) {
         self.writer_tx
             .send(message.to_string())
             .await
