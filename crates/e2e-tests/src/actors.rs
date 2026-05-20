@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use std::fs;
+use std::iter::repeat_with;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -15,7 +16,7 @@ use teamtype::{document, sandbox};
 use tempfile::{TempDir, tempdir};
 use tokio::process::{ChildStdin, Command};
 
-use crate::socket::*;
+use crate::socket::MockSocket;
 
 // TODO: Consider renaming this, to avoid confusion with tokio "actors".
 #[async_trait]
@@ -73,7 +74,7 @@ impl Neovim {
     /// # Panics
     ///
     /// Will panic if input cannot be sent to Neovim.
-    pub async fn input(&mut self, input: &str) {
+    pub async fn input(&self, input: &str) {
         self.nvim
             .input(input)
             .await
@@ -172,8 +173,8 @@ impl Actor for Neovim {
 }
 
 fn random_string(length: usize, components: &[String]) -> String {
-    (0..length)
-        .map(|_| components[rand_usize_inclusive(0, components.len() - 1)].clone())
+    repeat_with(|| components[rand_usize_inclusive(0, components.len() - 1)].clone())
+        .take(length)
         .collect::<String>()
 }
 

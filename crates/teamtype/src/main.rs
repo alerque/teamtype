@@ -305,15 +305,15 @@ fn setup_teamtype_directory(directory: &Path, temporary_directory: Option<&TempD
 
         if ask(&format!(
             "Do you want to rename {}/ to {}/?",
-            &config::LEGACY_CONFIG_DIR,
-            &config::CONFIG_DIR,
+            config::LEGACY_CONFIG_DIR,
+            config::CONFIG_DIR,
         ))? {
             let new_directory = directory.join(config::CONFIG_DIR);
             sandbox::rename_file(directory, &old_directory, &new_directory)?;
         } else {
             bail!(
                 "Aborting launch. Rename or remove the {} directory yourself to continue.",
-                &config::LEGACY_CONFIG_DIR
+                config::LEGACY_CONFIG_DIR
             );
         }
     }

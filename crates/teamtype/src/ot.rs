@@ -258,8 +258,8 @@ fn transform_through_operations(
         let (my_prime, their_prime) = my_op_seq.transform(&their_op_seq).unwrap_or_else(|_| {
             panic!(
                 "Could not transform operations {:?} on top of {:?}.",
-                &their_op_seq.ops(),
-                &my_op_seq.ops()
+                their_op_seq.ops(),
+                my_op_seq.ops()
             )
         });
         transformed_my_operations.push(my_prime);

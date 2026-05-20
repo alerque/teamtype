@@ -29,7 +29,7 @@ fn instantiate_initial_automerge_doc() -> Result<()> {
     let initial_automerge_doc_path = Path::new("src").join("initial_automerge_doc.bin");
     println!(
         "cargo:rerun-if-changed={}",
-        &initial_automerge_doc_path.display()
+        initial_automerge_doc_path.display()
     );
     let force_generate = var_os("TEAMTYPE_GENERATE_NEW_INITIAL_AUTOMERGE_DOC").is_some();
     // The initial Automerge document state is hard coded and changing it would imply a breaking

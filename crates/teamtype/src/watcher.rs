@@ -104,21 +104,21 @@ impl Watcher {
                     let event = event.unwrap().unwrap();
                     match event.kind {
                         EventKind::Create(CreateKind::File) => {
-                            assert!(event.paths.len() == 1);
+                            assert_eq!(event.paths.len(), 1);
                             self.maybe_created(&event.paths[0]);
                         }
                         EventKind::Remove(RemoveKind::File) => {
-                            assert!(event.paths.len() == 1);
+                            assert_eq!(event.paths.len(), 1);
                             self.maybe_removed(&event.paths[0]);
                         }
                         EventKind::Modify(ModifyKind::Data(_)) => {
-                            assert!(event.paths.len() == 1);
+                            assert_eq!(event.paths.len(), 1);
                             self.maybe_modified(&event.paths[0]);
                         }
                         EventKind::Modify(ModifyKind::Name(
                             RenameMode::Both,
                         )) => {
-                            assert!(event.paths.len() == 2);
+                            assert_eq!(event.paths.len(), 2);
                             self.maybe_removed(&event.paths[0]);
                             self.maybe_created(&event.paths[1]);
                         }
@@ -127,7 +127,7 @@ impl Watcher {
                         EventKind::Modify(ModifyKind::Name(
                             RenameMode::Any,
                         )) => {
-                            assert!(event.paths.len() == 1);
+                            assert_eq!(event.paths.len(), 1);
                             let file_path = event.paths[0].clone();
                             match sandbox::exists(&self.app_config.base_dir, &file_path) {
                                 Ok(path_exists) => {

@@ -40,7 +40,7 @@ async fn teamtype_executable_from_nvim() {
 async fn nvim_sends_something_to_socket() {
     let (nvim, _file_path, mut socket, _dir) = Neovim::new_teamtype_enabled("hi").await;
     dbg!(nvim.content().await);
-    timeout(Duration::from_millis(1000), async {
+    timeout(Duration::from_secs(1), async {
         socket.acknowledge_open().await;
     })
     .await
@@ -126,8 +126,8 @@ async fn assert_nvim_input_yields_replacements(
     input: &str,
     mut expected_replacements: Vec<EditorTextOp>,
 ) {
-    timeout(Duration::from_millis(5000), async {
-                let (mut nvim, _file_path, mut socket, _dir) = Neovim::new_teamtype_enabled(initial_content).await;
+    timeout(Duration::from_secs(5), async {
+                let (nvim, _file_path, mut socket, _dir) = Neovim::new_teamtype_enabled(initial_content).await;
                 socket.acknowledge_open().await;
 
                 {
