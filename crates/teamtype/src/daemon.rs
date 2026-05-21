@@ -1013,7 +1013,7 @@ impl Daemon {
         let listener_path = base_dir
             .join(config::CONFIG_DIR)
             .join(config::DEFAULT_LISTENER_NAME);
-        editor::spawn_listener(&listener_path, document_handle.clone(), ui)?;
+        editor::spawn_listener(&listener_path, document_handle.clone(), ui).await?;
 
         // Start file watcher.
         spawn_file_watcher(&config, document_handle.clone());
