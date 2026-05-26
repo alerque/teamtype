@@ -2,14 +2,14 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-cargo := require('cargo')
-cargo-deny := require('cargo-deny')
+cargo := which('cargo')
+cargo-deny := which('cargo-deny')
 just := just_executable()
-luacheck := require('luacheck')
-nvim := require('nvim')
-reuse := require('reuse')
-stylua := require('stylua')
-typos := require('typos')
+luacheck := which('luacheck')
+nvim := which('nvim')
+reuse := which('reuse')
+stylua := which('stylua')
+typos := which('typos')
 
 # By default Just will re-use the user's $SHELL. In order to make use of script
 # rules and more advanced shell features we need a more predictable runtime
@@ -21,16 +21,20 @@ set shell := ['bash', '-eu', '-c']
 set positional-arguments
 set unstable
 
+[private]
+requires dep:
+    @: {{ require(dep) }}
+
 [group('check')]
 [parallel]
 check *ARGS: (check-cargo ARGS) check-typos
 
 [group('check')]
-check-cargo *ARGS:
+check-cargo *ARGS: (requires "cargo")
     {{ cargo }} check {{ ARGS }}
 
 [group('check')]
-check-typos:
+check-typos: (requires "typos")
     {{ typos }}
 
 [default]
@@ -39,7 +43,7 @@ check-typos:
     {{ just }} --list --unsorted
 
 [group('build')]
-build *ARGS:
+build *ARGS: (requires "cargo")
     {{ cargo }} build {{ ARGS }}
 
 [group('build')]
@@ -51,11 +55,11 @@ format: format-lua format-rust
 
 [group('format')]
 [working-directory("nvim-plugin")]
-format-lua:
+format-lua: (requires "stylua")
     {{ stylua }} --respect-ignores .
 
 [group('format')]
-format-rust:
+format-rust: (requires "cargo")
     {{ cargo }} +nightly fmt
 
 [group('lint')]
@@ -68,39 +72,39 @@ lint-format: lint-format-lua lint-format-rust
 
 [group('lint')]
 [working-directory("nvim-plugin")]
-lint-format-lua:
+lint-format-lua: (requires "cargo")
     {{ stylua }} --respect-ignores --check .
 
 [group('lint')]
-lint-format-rust:
+lint-format-rust: (requires "cargo")
     {{ cargo }} +nightly fmt --check
 
 [group('lint')]
-lint-license:
+lint-license: (requires "reuse")
     {{ reuse }} lint
 
 [group('lint')]
 [working-directory("nvim-plugin")]
-lint-lua:
+lint-lua: (requires "luacheck")
     {{ luacheck }} .
 
 [group('lint')]
-lint-manifests:
+lint-manifests: (requires "cargo-deny")
     {{ cargo-deny }} check
 
 [group('lint')]
-lint-rust:
+lint-rust: (requires "cargo")
     {{ cargo }} clippy
 
 [group('test')]
 test *ARGS: (test-cargo ARGS)
 
 [group('test')]
-test-cargo *ARGS:
+test-cargo *ARGS: (requires "cargo")
     {{ cargo }} test {{ ARGS }}
 
 [group('test')]
-fuzz:
+fuzz: (requires "cargo")
     {{ cargo }} test --test fuzzer
 
 # Verify all the things: check, lint, test, and fuzz.
@@ -115,7 +119,7 @@ perfect: check lint test fuzz
 #
 # Run Neovim with the plug-in for testing (can be used from outside the project).
 [no-cd]
-nvim *ARGS:
+nvim *ARGS: (requires "nvim")
     {{ nvim }} --clean \
         --cmd {{ quote("let &runtimepath=\"" + justfile_directory() + "/nvim-plugin,\" . &runtimepath") }} \
         --cmd 'runtime plugin/teamtype.lua' \
