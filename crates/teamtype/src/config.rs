@@ -15,6 +15,7 @@ use anyhow::{Context, Result};
 use docstr::docstr;
 use git2::{Config as GitConfig, ConfigLevel};
 use ini::{Ini, Properties};
+use serde::{Deserialize, Serialize};
 use tempfile::{TempDir, tempdir_in};
 
 use crate::sandbox;
@@ -36,7 +37,8 @@ const EMIT_SECRET_ADDRESS_DEFAULT: bool = false;
 const USERNAME_FALLBACK: &str = "Anonymous";
 
 /// A peer defines how to look for the other end of a peer-2-peer link.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Peer {
     /// An Iroh secret address. Holding this likely means we've successfully connected to the Peer
     /// before, but it is possible (if not very safe) to pass around this secret identify as well.
@@ -121,6 +123,21 @@ impl Display for ProjectDir {
     }
 }
 
+impl Serialize for ProjectDir {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Permanent(path) => path.serialize(serializer),
+            Self::Temporary(temp_dir) => temp_dir.path().to_path_buf().serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ProjectDir {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        PathBuf::deserialize(deserializer).map(Self::Permanent)
+    }
+}
+
 impl Clone for ProjectDir {
     fn clone(&self) -> Self {
         match self {
@@ -131,21 +148,29 @@ impl Clone for ProjectDir {
 }
 
 /// Whether or not to sync version-control directories like `.git/` or `.jj/`.
-#[derive(Default, Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Default, Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum VcsMode {
     Sync,
     #[default]
     Ignore,
 }
 
-#[derive(Default, Copy, Clone, Debug, Eq, PartialEq)]
+impl From<bool> for VcsMode {
+    fn from(value: bool) -> Self {
+        if value { Self::Sync } else { Self::Ignore }
+    }
+}
+
+#[derive(Default, Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum NetworkMode {
     #[default]
     Host,
     Peer,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+#[must_use]
 pub struct Config {
     /// Base project directory where everything Teamtype does for a share will be sandboxed.
     pub project_dir: ProjectDir,
