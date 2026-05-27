@@ -54,3 +54,7 @@ pub use daemon::Daemon;
 pub use daemon::run_daemon;
 pub use traits::Interactions;
 pub use types::UserInterface;
+
+// Binding modules (feature gated)
+#[cfg(feature = "luamodule")]
+mod lua;
