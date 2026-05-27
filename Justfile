@@ -103,6 +103,10 @@ test-cargo *ARGS:
 fuzz:
     {{ cargo }} test --test fuzzer
 
+canary:
+    {{ cargo }} +nightly clippy --all-features --all-targets
+    {{ cargo }} +nightly check --all-features --all-targets
+
 # Verify all the things: check, lint, test, and fuzz.
 [parallel]
 perfect: check lint test fuzz
