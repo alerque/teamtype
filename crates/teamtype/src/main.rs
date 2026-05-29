@@ -78,6 +78,37 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+fn parse_directory_config(cli: &Cli) -> Result<Option<PathBuf>> {
+    match cli.command {
+        Commands::Share {
+            shared_flags:
+                ShareJoinFlags {
+                    temporary_directory,
+                    ..
+                },
+            ..
+        }
+        | Commands::Join {
+            shared_flags:
+                ShareJoinFlags {
+                    temporary_directory,
+                    ..
+                },
+            ..
+        } => {
+            if temporary_directory {
+                return Ok(None);
+            }
+        }
+        Commands::Client => {}
+    }
+    let directory = match cli.directory {
+        Some(ref directory) => directory,
+        None => &current_dir().context("Could not access current directory")?,
+    };
+    Ok(Some(directory.clone()))
+}
+
 async fn trap_shutdown(ui: &UserInterface) {
     let interruption = async {
         signal::ctrl_c()
