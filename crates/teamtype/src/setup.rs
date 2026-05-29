@@ -15,33 +15,37 @@ use crate::sandbox;
 use crate::types::UserInterface;
 
 pub fn setup_teamtype_directory(
-    directory: &Path,
-    temporary_directory: Option<&TempDir>,
+    directory: Option<&Path>,
     ui: &UserInterface,
-) -> Result<()> {
-    if !has_teamtype_directory(directory) {
-        let teamtype_dir = directory.join(config::CONFIG_DIR);
-        let directory_is_temporary_directory = temporary_directory.is_some();
-        if directory_is_temporary_directory {
-            ui.log(&format!(
-                "'{}' is the temporary directory that is used as a Teamtype directory.",
-                directory.display()
-            ));
-            sandbox::create_dir(directory, &teamtype_dir)?;
-        } else if ui.confirm(&docstr!(format!
+) -> Result<(PathBuf, Option<TempDir>)> {
+    let (base_dir, temp_dir) = if let Some(directory) = directory.as_ref() {
+        let base_dir = directory.canonicalize().with_context(|| {
+            format!(
+                "Could not compute the absolute, canonical form of the path of directory {}",
+                directory.display(),
+            )
+        })?;
+        (base_dir, None)
+    } else {
+        let temp_dir = setup_temporary_directory()?;
+        (temp_dir.path().to_path_buf(), Some(temp_dir))
+    };
+    if !has_teamtype_directory(&base_dir) {
+        let teamtype_dir = base_dir.join(config::CONFIG_DIR);
+        if ui.confirm(&docstr!(format!
             /// '{}' hasn't been used as a Teamtype directory before.
             ///
             /// Do you want to enable live collaboration here? (This will create a {}/ directory.)
-            directory.display(),
+            base_dir.display(),
             config::CONFIG_DIR
         ))? {
-            sandbox::create_dir(directory, &teamtype_dir)?;
+            sandbox::create_dir(&base_dir, &teamtype_dir)?;
             ui.log("Created! Resuming launch.");
         } else {
             bail!("Aborting launch. Teamtype needs a .teamtype/ directory to function");
         }
     }
-    Ok(())
+    Ok((base_dir, temp_dir))
 }
 
 fn has_teamtype_directory(dir: &Path) -> bool {
