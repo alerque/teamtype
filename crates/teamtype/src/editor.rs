@@ -93,17 +93,19 @@ pub fn spawn_listener(
     document_handle: DocumentActorHandle,
     ui: &UserInterface,
 ) -> Result<()> {
-    let parent_path = listener_path
+    let listener_dir = listener_path
         .parent()
         .context("Invalid socket creation location")?;
     // Make sure the parent directory of the socket is only accessible by the current user.
-    check_mode(parent_path, 0o77700u32)?;
+    check_mode(listener_dir, 0o77700u32)?;
 
     // Using the sandbox method here is technically unnecessary, but we want to really run all path
     // operations through the sandbox module.
-    // TODO: Use correct directory as guard.
-    if sandbox::exists(Path::new("/"), Path::new(&listener_path))
-        .expect("Failed to check existence of path")
+    if sandbox::exists(
+        listener_dir.parent().context("Presumed base_dir invalid")?,
+        listener_path,
+    )
+    .expect("Failed to check existence of path")
     {
         let listener_path_display = listener_path.display();
         let remove_listener = ui.confirm(&format!(
@@ -127,7 +129,7 @@ pub fn spawn_listener(
         // (which already changes to that location) but it will make this API usable when linked as a
         // library without changing the parent thread's location for keeps.
         let previous_cwd = env::current_dir()?;
-        env::set_current_dir(parent_path)?;
+        env::set_current_dir(listener_dir)?;
         let listener = UnixListener::bind(strip_current_dir(listener_path))?;
         env::set_current_dir(previous_cwd)?;
         debug!("Listening on UNIX socket: {}", listener_path.display());
