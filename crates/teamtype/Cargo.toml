@@ -50,6 +50,9 @@ clap_mangen = "0.3"
 version = "4"
 features = ["derive", "env"]
 
+[target.'cfg(windows)'.build-dependencies]
+static_vcruntime = "3"
+
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
