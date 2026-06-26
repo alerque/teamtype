@@ -12,7 +12,7 @@
   };
 
   outputs =
-    inputs:
+    { self, ... }@inputs:
     inputs.flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [
         "x86_64-linux"
@@ -34,6 +34,7 @@
             libgit2
           ];
           buildDeps = with pkgs; [
+            git
             pkg-config
           ];
           devDeps = with pkgs; [
@@ -58,6 +59,14 @@
             else
               cargoToml.package.${key};
 
+          dateToYmd =
+            dateStr:
+            let
+              clean =
+                if builtins.isString dateStr && builtins.stringLength dateStr >= 8 then dateStr else "19700101";
+            in
+            "${builtins.substring 0 4 clean}-${builtins.substring 4 2 clean}-${builtins.substring 6 2 clean}";
+
           msrv = resolveManifestValue "rust-version";
 
           rustPlatform = pkgs.makeRustPlatform {
@@ -70,7 +79,16 @@
             rustPlatform.buildRustPackage {
               name = resolveManifestValue "name";
               version = resolveManifestValue "version";
-              src = ./.;
+              src =
+                if self ? rev then
+                  builtins.fetchGit {
+                    url = ./.;
+                    rev = self.rev;
+                    allRefs = true;
+                    leaveDotGit = true;
+                  }
+                else
+                  ./.;
               cargoLock.lockFile = ./Cargo.lock;
               buildFeatures = features;
               buildInputs = runtimeDeps;
@@ -78,8 +96,20 @@
               env = {
                 LIBGIT2_NO_VENDOR = 1;
               };
+              # Extra env vars to output only if we have Git history to derive it from.
+              preBuild =
+                if self ? rev then
+                  ''
+                    export VERGEN_GIT_SHA="$(git rev-parse HEAD)"
+                    export VERGEN_GIT_DESCRIBE="$(git describe --long --abbrev=9)"
+                    export VERGEN_GIT_COMMIT_DATE="$(git show -s --format=%cs HEAD)"
+                    export VERGEN_GIT_DIRTY="${lib.boolToString (self ? dirtyRev)}"
+                  ''
+                else
+                  "";
               doCheck = false;
             };
+          src = builtins.fetchGit { url = ./.; };
 
           mkDevShell = pkgs.mkShell {
             buildInputs = runtimeDeps;
