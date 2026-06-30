@@ -66,21 +66,30 @@
             rustc = pkgs.rust-bin.stable.latest.minimal;
           };
 
+          # Include .git directory for local builds, fetch with allRefs for remote builds
+          sourceWithGit =
+            if builtins.pathExists "${toString ./.}/.git" then
+              lib.cleanSourceWith {
+                src = ./.;
+                filter = path: type:
+                  let
+                    baseName = baseNameOf path;
+                  in
+                    baseName == ".git" || lib.cleanSourceFilter path type;
+              }
+            else
+              builtins.fetchGit {
+                url = self.sourceInfo.url;
+                rev = self.rev;
+                allRefs = true;
+              };
+
           rustPackage =
             features:
             rustPlatform.buildRustPackage {
               name = resolveManifestValue "name";
               version = resolveManifestValue "version";
-              src =
-                if self ? rev then
-                  builtins.fetchGit {
-                    url = ./.;
-                    rev = self.rev;
-                    allRefs = true;
-                    leaveDotGit = true;
-                  }
-                else
-                  ./.;
+              src = sourceWithGit;
               cargoLock.lockFile = ./Cargo.lock;
               buildFeatures = features;
               buildInputs = runtimeDeps;
@@ -90,12 +99,9 @@
               };
               # Extra env vars to output only if we have Git history to derive it from.
               preConfigure = ''
-                pwd
-                ls -al
-                exit 1
                 if git rev-parse --git-dir > /dev/null 2>&1; then
                   export VERGEN_GIT_SHA="$(git rev-parse HEAD)"
-                  export VERGEN_GIT_DESCRIBE="$(git describe --long --tags --match ="v${resolveManifestValue "version"}" --abbrev=9)"
+                  export VERGEN_GIT_DESCRIBE="$(git describe --long --tags --match="v${resolveManifestValue "version"}" --abbrev=9)"
                   export VERGEN_GIT_COMMIT_DATE="$(git show -s --format=%cs HEAD)"
                   export VERGEN_GIT_DIRTY="${lib.boolToString (self ? dirtyRev)}"
                 fi
