@@ -90,7 +90,11 @@
                   export VERGEN_GIT_DESCRIBE="$(git describe --long --tags --match "v${resolveManifestValue "version"}" --abbrev=9)"
                   export VERGEN_GIT_COMMIT_DATE="$(git show -s --format=%cs HEAD)"
                   export VERGEN_GIT_DIRTY="${lib.boolToString (self ? dirtyRev)}"
+                  env
+                else
+                  ls -al
                 fi
+                exit 1
               '';
               doCheck = false;
             };
