@@ -66,51 +66,50 @@
             rustc = pkgs.rust-bin.stable.latest.minimal;
           };
 
-          sourceWithGit =
-            # If using a locked (clean) input, clone from remote with history
-            if self ? rev && self.rev != null then
-              builtins.fetchGit {
-                url = self.sourceInfo.url;
-                rev = self.rev;
-                allRefs = true;
-                leaveDotGit = true;
-              }
-            # If using a dirty local input, clone from local working copy with history
-            else if builtins.pathExists (toString ./. + "/.git") then
-              builtins.fetchGit {
-                url = toString ./.;
-                allRefs = true;
-                leaveDotGit = true;
-              }
-            # Fallback for `git archive` generated tarballs without git history
-            else
-              ./.;
-
           rustPackage =
             features:
+            let
+              hasGit = self ? rev;
+              isDirty = self ? dirtyRev;
+              gitRev = if isDirty then self.dirtyRev else if hasGit then self.rev else null;
+              # lastModifiedDate is "YYYYMMDDHHMMSS" — reformat to "YYYY-MM-DD"
+              commitDate =
+                let
+                  d = self.lastModifiedDate;
+                in
+                "${builtins.substring 0 4 d}-${builtins.substring 4 2 d}-${builtins.substring 6 2 d}";
+            in
             rustPlatform.buildRustPackage {
               name = resolveManifestValue "name";
               version = resolveManifestValue "version";
-              src = sourceWithGit;
+              src = self.outPath;
               cargoLock.lockFile = ./Cargo.lock;
               buildFeatures = features;
               buildInputs = runtimeDeps;
               nativeBuildInputs = buildDeps;
-              env = {
-                LIBGIT2_NO_VENDOR = 1;
-              };
-              # Populate vergen env vars ahead of time if Nix has access to git history.
+              env =
+                {
+                  LIBGIT2_NO_VENDOR = 1;
+                }
+                // lib.optionalAttrs hasGit {
+                  VERGEN_GIT_SHA = gitRev;
+                  VERGEN_GIT_DIRTY = lib.boolToString isDirty;
+                  VERGEN_GIT_COMMIT_DATE = commitDate;
+                };
+              # VERGEN_GIT_DESCRIBE can't be derived from flake metadata alone
+              # (it requires tag distance), so we compute it at build time using
+              # the original source tree's .git dir when it exists.
               preConfigure = ''
-                if git rev-parse --git-dir > /dev/null 2>&1; then
-                  export VERGEN_GIT_SHA="$(git rev-parse HEAD)"
-                  export VERGEN_GIT_DESCRIBE="$(git describe --long --tags --match "v${resolveManifestValue "version"}" --abbrev=9)"
-                  export VERGEN_GIT_COMMIT_DATE="$(git show -s --format=%cs HEAD)"
-                  export VERGEN_GIT_DIRTY="${lib.boolToString (self ? dirtyRev)}"
-                  env
-                else
-                  ls -al
+                _gitdir="${toString ./.}/.git"
+                if [ -d "$_gitdir" ]; then
+                  export VERGEN_GIT_DESCRIBE="$(
+                    git --git-dir="$_gitdir" describe \
+                      --long --tags \
+                      --match "v${resolveManifestValue "version"}" \
+                      --abbrev=9 \
+                      ${lib.optionalString isDirty "--dirty"}
+                  )"
                 fi
-                exit 1
               '';
               doCheck = false;
             };
