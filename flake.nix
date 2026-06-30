@@ -68,7 +68,7 @@
 
           sourceWithGit =
             # If using a locked (clean) input, clone from remote with history
-            if self ? rev && self.rev != null then
+            if self ? rev then
               builtins.fetchGit {
                 url = self.sourceInfo.url;
                 rev = self.rev;
@@ -76,7 +76,7 @@
                 leaveDotGit = true;
               }
             # If using a dirty local input, clone from local working copy with history
-            else if builtins.pathExists (toString ./. + "/.git") then
+            else if self ? dirtyRev then
               builtins.fetchGit {
                 url = toString ./.;
                 allRefs = true;
