@@ -67,22 +67,22 @@
           };
 
           sourceWithGit =
-            # If using a locked (clean) input, clone from remote with history
-            if self ? rev then
+            # Local working copy – use file:// URL so leaveDotGit is supported
+            if builtins.pathExists (toString ./. + "/.git") then
+              builtins.fetchGit {
+                url = "file://${toString ./.}";
+                allRefs = true;
+                leaveDotGit = true;
+              }
+            # Remote / locked flake input – fetch exact commit with .git
+            else if self ? rev && self.rev != null && self.sourceInfo ? url then
               builtins.fetchGit {
                 url = self.sourceInfo.url;
                 rev = self.rev;
                 allRefs = true;
                 leaveDotGit = true;
               }
-            # If using a dirty local input, clone from local working copy with history
-            else if self ? dirtyRev then
-              builtins.fetchGit {
-                url = toString ./.;
-                allRefs = true;
-                leaveDotGit = true;
-              }
-            # Fallback for `git archive` generated tarballs without git history
+            # Fallback for tarballs without git history
             else
               ./.;
 
