@@ -189,7 +189,7 @@ pristine:
     # Ensure there are no changes in the working tree.
     {{ git }} diff-files --quiet || exit 1
 
-read-current-user() := shell('whoami || echo $USER')
+read-current-user() := replace(shell('whoami || echo $USER'), "mn", "zormit")
 read-recent-tag() := shell(git + ' tag --list | tail -1')
 
 # Verify privileges needed for publishing, hopefully before the process is half way done.
