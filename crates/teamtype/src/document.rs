@@ -232,12 +232,25 @@ impl Document {
         desired_text: &str,
         file_path: &RelativePath,
     ) -> Option<TextDelta> {
-        if self.text_obj(file_path).is_ok() {
-            let Some(Content::String(current_text)) = self.current_file_content(file_path) else {
-                panic!("Failed to get {file_path} text object");
+        if let Ok(text_obj) = self.text_obj(file_path) {
+            let current_text = if let Some(Content::String(text)) =
+                self.current_file_content(file_path)
+            {
+                text.clone()
+            } else {
+                debug!(
+                    "Restoring previously deleted document '{file_path}' from cache to apply update."
+                );
+                let text = self
+                    .doc
+                    .text(&text_obj)
+                    .unwrap_or_else(|_| panic!("Failed to get {file_path} text object"));
+                self.files
+                    .insert(file_path.clone(), Content::String(text.clone()));
+                text
             };
 
-            let chunks = dissimilar::diff(current_text, desired_text);
+            let chunks = dissimilar::diff(&current_text, desired_text);
             if let [] | [Chunk::Equal(_)] = chunks.as_slice() {
                 return None;
             }
