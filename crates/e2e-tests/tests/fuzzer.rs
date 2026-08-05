@@ -38,7 +38,6 @@ fn initialize_directory() -> (BaseDir, PathBuf) {
     sandbox::create_dir(&base_dir, &teamtype_dir).expect("Failed to create .teamtype directory");
 
     let file = base_dir.join(TEST_FILE_PATH);
-    sandbox::write_file(&base_dir, &file, b"").expect("Failed to create file in temp directory");
 
     (base_dir, file)
 }
@@ -80,6 +79,9 @@ async fn main() -> Result<()> {
     // the handle goes out of scope. We don't *use* the handle but we do need to keep it in scope.
     let (base_dir1, file1) = initialize_directory();
     let (base_dir2, file2) = initialize_directory();
+
+    // Seed an empty starting file to what will be the sharing daemon side of the test session.
+    sandbox::write_file(&base_dir1, &file1, b"").expect("Failed to create file in temp directory");
 
     // Set up the actors.
     let config1 = Config {
