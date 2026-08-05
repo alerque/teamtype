@@ -85,26 +85,26 @@ async fn main() -> Result<()> {
     let (_handle2, dir2, file2) = initialize_directory();
 
     // Set up the actors.
-    let mut config = Config::default();
-    config.base_dir = dir1;
-    let daemon = Daemon::new(config, true, false, ui).await?;
+    let mut config1 = Config::default();
+    config1.base_dir = dir1;
+    let daemon1 = Daemon::new(config1, true, false, ui).await?;
 
     // Wait until iroh's DNS discovery (hopefully) works.
     sleep(Duration::from_millis(1000)).await;
 
-    let nvim = Neovim::new(Some(file1)).await;
+    let nvim1 = Neovim::new(Some(file1)).await;
 
     let mut config2 = Config::default();
     config2.base_dir = dir2;
     config2.peer = Some(config::Peer::SecretAddress(
-        daemon.secret_address().to_string(),
+        daemon1.secret_address().to_string(),
     ));
-    let peer = Daemon::new(config2, false, false, ui).await?;
+    let daemon2 = Daemon::new(config2, false, false, ui).await?;
 
     // Wait until file2 appears.
     while !file2.exists() {
         dbg!("{&file2} doesnt");
-        sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(500)).await;
     }
 
     let nvim2 = Neovim::new(Some(file2)).await;
@@ -113,9 +113,9 @@ async fn main() -> Result<()> {
     sleep(Duration::from_millis(1000)).await;
 
     let mut actors: HashMap<String, Box<dyn Actor>> = HashMap::new();
-    actors.insert("daemon".to_string(), Box::new(daemon));
-    actors.insert("nvim".to_string(), Box::new(nvim));
-    actors.insert("peer".to_string(), Box::new(peer));
+    actors.insert("daemon1".to_string(), Box::new(daemon1));
+    actors.insert("nvim1".to_string(), Box::new(nvim1));
+    actors.insert("daemon2".to_string(), Box::new(daemon2));
     actors.insert("nvim2".to_string(), Box::new(nvim2));
 
     ui.log("Performing edits");
