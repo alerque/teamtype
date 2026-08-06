@@ -22,3 +22,6 @@ pub mod traits;
 pub mod types;
 pub mod watcher;
 pub mod wormhole;
+
+#[cfg(test)]
+pub(crate) mod testing;
