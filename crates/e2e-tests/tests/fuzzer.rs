@@ -20,7 +20,7 @@ use teamtype::traits::Interactions;
 use teamtype::types::UserInterface;
 use tempfile::{TempDir, tempdir};
 use tokio::time::{Duration, sleep, timeout};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 async fn perform_random_edits(actor: &mut (impl Actor + ?Sized)) {
     for _ in 1..500 {
@@ -48,7 +48,12 @@ fn initialize_directory() -> (TempDir, PathBuf, PathBuf) {
 
 struct FuzzerInteractions {}
 
-impl Interactions for FuzzerInteractions {}
+impl Interactions for FuzzerInteractions {
+    fn confirm(&self, question: &str) -> Result<bool> {
+        debug!("Fuzzer asked for a confirmation '{question}', answering with 'false'");
+        Ok(false)
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
