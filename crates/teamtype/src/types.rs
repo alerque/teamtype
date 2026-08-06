@@ -30,6 +30,12 @@ use crate::traits::Interactions;
 #[derive(Clone, Deref)]
 pub struct UserInterface(Arc<dyn Interactions>);
 
+impl fmt::Debug for UserInterface {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0.type_name())
+    }
+}
+
 impl UserInterface {
     /// Take any trait object that implements [`Interactions`] and return a reference counting
     /// pointer to the user interface implementation. This makes it possible to pass a around the UI
