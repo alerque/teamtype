@@ -27,7 +27,9 @@ impl AbsolutePath {
     }
 
     pub fn to_file_uri(&self) -> FileUri {
-        FileUri::try_from(format!("file://{}", self.0.display()))
+        let url = Url::from_file_path(&self.0)
+            .expect("Should be able to create file:// URL from absolute path");
+        FileUri::try_from(url.to_string())
             .expect("Should be able to create File URI from absolute path")
     }
 }
