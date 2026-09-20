@@ -13,6 +13,8 @@ use derive_more::{AsRef, Deref, Display};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use crate::sandbox;
+
 /// Paths like these are guaranteed to be absolute.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, Deref, AsRef, Display)]
 #[as_ref(Path)]
@@ -96,16 +98,41 @@ impl RelativePath {
         Self(path.into())
     }
 
-    pub fn try_from_absolute(project_dir: &Path, path: &AbsolutePath) -> Result<Self, anyhow::Error> {
-        let shared_dir = path::absolute(project_dir).with_context(|| {
+    pub fn try_from_absolute(
+        project_dir: &Path,
+        path: &AbsolutePath,
+    ) -> Result<Self, anyhow::Error> {
+        // Canonicalize both paths (resolving symlinks) before comparing them. On macOS, for
+        // example, /var is a symlink to /private/var, so the file watcher reports paths like
+        // `/private/var/...` while the shared directory is spelled `/var/...`. A bare
+        // `strip_prefix` would fail to recognize those as the same location. The sandbox helper
+        // only canonicalizes the parts of the path that still exist, so it also works for paths
+        // whose final components have already been removed (as with watcher events for deletions).
+        let shared_dir = path::absolute(project_dir)
+            .with_context(|| {
+                format!(
+                    "Failed to get absolute path for shared directory '{}'",
+                    project_dir.display()
+                )
+            })
+            .and_then(|project_dir| sandbox::absolute_and_canonicalized(&project_dir))
+            .with_context(|| {
+                format!(
+                    "Failed to get the canonical form of shared directory '{}'",
+                    project_dir.display()
+                )
+            })?;
+        let absolute_path = sandbox::absolute_and_canonicalized(&path.0).with_context(|| {
             format!(
-                "Failed to get absolute path for shared directory '{}'",
-                project_dir.display()
+                "Failed to get the canonical form of file path '{}'",
+                path.display()
             )
         })?;
-        let relative_path = path.strip_prefix(&shared_dir).with_context(|| {
+
+        let relative_path = absolute_path.strip_prefix(&shared_dir).with_context(|| {
             format!(
-                "The path {path} is not in the shared directory '{}'. Your plugin probably doesn't support opening files from multiple Teamtype directories.",
+                "The path {} is not in the shared directory '{}'. Your plugin probably doesn't support opening files from multiple Teamtype directories.",
+                absolute_path.display(),
                 shared_dir.display()
             )
         })?;
@@ -201,13 +228,49 @@ mod test {
 
         let file_paths = vec!["file1", "sub/file3", "sub"];
         for &expected in &file_paths {
-            let uri =
-                FileUri::try_from(format!("file://{}/{}", project_dir.display(), expected)).unwrap();
+            let uri = FileUri::try_from(format!("file://{}/{}", project_dir.display(), expected))
+                .unwrap();
             let absolute_path = uri.to_absolute_path();
-            let relative_path = RelativePath::try_from_absolute(project_dir, &absolute_path).unwrap();
+            let relative_path =
+                RelativePath::try_from_absolute(project_dir, &absolute_path).unwrap();
 
             assert_eq!(RelativePath::new(expected), relative_path);
         }
+    }
+
+    // On macOS, temp directories are created under /var/folders/..., which is a symlink to
+    // /private/var/folders/.... The base directory we get from `tempdir()` uses the symlinked
+    // spelling, while the file watcher reports the real path. Make sure both spellings resolve to
+    // the same relative path.
+    #[cfg(unix)]
+    #[test]
+    fn test_symlinked_base_dir_compared_to_real_path() {
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let real_dir = dir.path().join("real");
+        let link_dir = dir.path().join("link");
+        std::fs::create_dir(&real_dir).expect("Failed to create dir");
+        symlink(&real_dir, &link_dir).expect("Failed to create symlink");
+
+        let real_file = real_dir.join("file");
+        std::fs::write(&real_file, b"hi").expect("Failed to write file");
+
+        // The same file, spelled the way the daemon would hold the base directory (through the
+        // symlink) vs the way the watcher reports event paths (via the real path).
+        let relative_path =
+            RelativePath::try_from_absolute(&link_dir, &AbsolutePath::try_from(real_file).unwrap())
+                .unwrap();
+        assert_eq!(RelativePath::new("file"), relative_path);
+
+        // And the reverse spelling: real base directory, symlinked event path.
+        let linked_file = link_dir.join("file");
+        let relative_path = RelativePath::try_from_absolute(
+            &real_dir,
+            &AbsolutePath::try_from(linked_file).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(RelativePath::new("file"), relative_path);
     }
 
     #[test]

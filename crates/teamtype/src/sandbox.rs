@@ -210,7 +210,7 @@ fn check_inside_project_dir_and_canonicalize(project_dir: &Path, path: &Path) ->
     Ok(canonical_path)
 }
 
-fn absolute_and_canonicalized(path: &Path) -> Result<PathBuf> {
+pub(crate) fn absolute_and_canonicalized(path: &Path) -> Result<PathBuf> {
     if !path.has_root() {
         bail!("Path is not absolute.");
     }

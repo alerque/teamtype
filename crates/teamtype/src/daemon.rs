@@ -521,9 +521,23 @@ impl DocumentActor {
     }
 
     fn handle_watcher_event(&mut self, watcher_event: &WatcherEvent) {
+        // Watcher events normally point at files inside the shared directory, but on some
+        // platforms paths can be reported through symlinked spellings (e.g. /private/var vs /var
+        // on macOS). `try_from_path` canonicalizes both sides, so that's handled. If a path still
+        // doesn't resolve (e.g. an event racing with removal while the daemon shuts down), warn
+        // and skip it rather than taking the whole daemon down.
         let relative_file_path =
-            RelativePath::try_from_path(&self.project_dir, &watcher_event.file_path)
-                .expect("Watcher event should have a path within the project directory");
+            match RelativePath::try_from_path(&self.project_dir, &watcher_event.file_path) {
+                Ok(relative_file_path) => relative_file_path,
+                Err(error) => {
+                    self.ui.warn(&format!(
+                        "Watcher event for '{}' is not within the project directory '{}': {error}",
+                        watcher_event.file_path.display(),
+                        self.project_dir.display()
+                    ));
+                    return;
+                }
+            };
 
         if self.owns(&relative_file_path) {
             match watcher_event.event_type {
