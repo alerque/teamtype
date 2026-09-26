@@ -15,6 +15,7 @@ use teamtype::{
     types::{EditorTextDelta, EditorTextOp, factories::*},
 };
 use tokio::time::{Duration, timeout};
+use tracing::debug;
 
 #[tokio::test]
 async fn plugin_loaded() {
@@ -27,7 +28,8 @@ async fn plugin_loaded() {
 #[tokio::test]
 async fn nvim_sends_something_to_socket() {
     let (nvim, _file_path, mut socket, _dir) = Neovim::new_teamtype_enabled("hi").await;
-    dbg!(nvim.content().await);
+    let the_something = nvim.content().await;
+    debug!(the_something);
     timeout(Duration::from_secs(1), async {
         socket.acknowledge_open().await;
     })
