@@ -60,11 +60,10 @@ impl Watcher {
 
         let (tx, rx) = mpsc::channel(1);
         let mut watcher = notify::recommended_watcher(move |res: NotifyResult<Event>| {
-            executor::block_on(async {
-                tx.send(res)
-                    .await
-                    .expect("Unable to send over mpsc channel from file watcher");
-            });
+            // If the watcher is shutting down, the receiving end is gone and we just drop the
+            // event. Panicking here would take down the whole process (and, in the fuzzer, abort
+            // the test) just because a file watcher was dropped.
+            let _ = executor::block_on(tx.send(res));
         })
         .expect("Could not construct watcher");
 

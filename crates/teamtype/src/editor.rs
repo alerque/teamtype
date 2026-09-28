@@ -12,10 +12,11 @@ use std::{env, fs};
 
 use anyhow::bail;
 use anyhow::{Context, Result};
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 use tokio::{
-    io::WriteHalf,
     net::{UnixListener, UnixStream},
+    sync::mpsc,
+    sync::mpsc::error::SendError,
 };
 use tokio_util::{
     bytes::BytesMut,
@@ -32,7 +33,29 @@ use crate::types::UserInterface;
 
 pub type EditorId = usize;
 
-pub type EditorWriter = FramedWrite<WriteHalf<UnixStream>, OutgoingProtocolCodec>;
+/// How many messages we tolerate queuing up for a single editor before we warn about it.
+const EDITOR_BACKLOG_WARN_THRESHOLD: usize = 10_000;
+
+/// A handle to send messages to one connected editor.
+///
+/// Sending never blocks the caller. The actual socket write happens in a dedicated task, so a
+/// single editor that stops reading (because it is busy, wedged, or simply too slow) can never
+/// stall the rest of the daemon. Without this, one lagging editor would block the document actor
+/// on a full socket buffer, which in turn blocks *everything* else: peer sync, the file watcher,
+/// and any request for the current content.
+#[derive(Clone, Debug)]
+pub struct EditorWriter {
+    message_tx: mpsc::UnboundedSender<OutgoingMessage>,
+}
+
+impl EditorWriter {
+    /// Queue a message for the editor.
+    ///
+    /// Fails only if the writer task is gone, i.e. the editor connection is already broken.
+    pub fn send(&self, message: OutgoingMessage) -> Result<(), SendError<OutgoingMessage>> {
+        self.message_tx.send(message)
+    }
+}
 
 #[derive(Debug)]
 pub struct OutgoingProtocolCodec;
@@ -184,10 +207,39 @@ async fn handle_editor_connection(
 ) {
     let (stream_read, stream_write) = tokio::io::split(stream);
     let mut reader = FramedRead::new(stream_read, IncomingProtocolCodec);
-    let writer = FramedWrite::new(stream_write, OutgoingProtocolCodec);
 
+    // Writing to the editor happens in its own task, so that a slow editor can not block the
+    // document actor (and thereby the whole daemon) on a full socket buffer.
+    let (message_tx, mut message_rx) = mpsc::unbounded_channel();
+    let writer_task = tokio::spawn({
+        let ui = ui.clone();
+        async move {
+            let mut writer = FramedWrite::new(stream_write, OutgoingProtocolCodec);
+            let mut warned_about_backlog = false;
+            while let Some(message) = message_rx.recv().await {
+                if !warned_about_backlog && message_rx.len() > EDITOR_BACKLOG_WARN_THRESHOLD {
+                    ui.warn(&format!(
+                        "Editor #{editor_id} is not reading from its socket fast enough. There are \
+                         more than {EDITOR_BACKLOG_WARN_THRESHOLD} messages queued up for it."
+                    ));
+                    warned_about_backlog = true;
+                }
+                if let Err(e) = writer.send(message).await {
+                    // The editor is gone. Stop the writer task; the reader loop below will notice
+                    // the closed connection and clean up the editor.
+                    ui.warn(&format!("Failed to write to editor #{editor_id}: {e}"));
+                    return;
+                }
+            }
+        }
+    });
+
+    let editor_writer = EditorWriter { message_tx };
     document_handle
-        .send_message(DocMessage::NewEditorConnection(editor_id, writer))
+        .send_message(DocMessage::NewEditorConnection(
+            editor_id,
+            editor_writer.clone(),
+        ))
         .await;
     ui.log(&format!("Editor #{editor_id} connected."));
 
@@ -209,14 +261,19 @@ async fn handle_editor_connection(
                 };
                 ui.warn(&format!("Error for JSON-RPC request: {response:?}"));
                 let message = OutgoingMessage::Response(response);
-                document_handle
-                    .send_message(DocMessage::ToEditor(editor_id, message))
-                    .await;
+                if editor_writer.send(message).is_err() {
+                    break;
+                }
             }
         }
     }
     // Err(e) => {
     // }
+
+    // The connection is going away. The writer task holds the write half of the socket, so stop
+    // it instead of leaving it (potentially blocked on a write to a dead peer) behind.
+    drop(editor_writer);
+    writer_task.abort();
 
     document_handle
         .send_message(DocMessage::CloseEditorConnection(editor_id))

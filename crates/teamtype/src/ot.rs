@@ -12,6 +12,9 @@ use tracing::{debug, warn};
 
 use crate::types::{EditorTextDelta, RevisionedEditorTextDelta, RevisionedTextDelta, TextDelta};
 
+/// How many unconfirmed operations we tolerate before warning about a lagging editor.
+const UNCONFIRMED_QUEUE_WARN_THRESHOLD: usize = 500;
+
 ///    `OTServer` receives operations from both the CRDT world, and one editor and makes sure that
 ///    the editor operations (which might be based on an older document) are applicable to the
 ///    state that the CRDT is tracking.
@@ -100,6 +103,13 @@ impl OTServer {
         self.operations.push(delta.clone().into());
         self.editor_queue.push(delta.clone().into());
         self.daemon_revision += 1;
+        if self.editor_queue.len() == UNCONFIRMED_QUEUE_WARN_THRESHOLD {
+            warn!(
+                "Editor is {UNCONFIRMED_QUEUE_WARN_THRESHOLD} operations behind. It is not \
+                 catching up, so we keep resending the whole unconfirmed queue to it. This grows \
+                 quadratically."
+            );
+        }
         // Use "previous" content to transform into editor text delta.
         let editor_delta = EditorTextDelta::try_from_delta(delta.clone(), &self.current_content).context("Failed to convert delta to editor delta, under the given content. Was the edit invalid?")?;
         self.current_content = Self::force_apply(&self.current_content, delta.clone().into());

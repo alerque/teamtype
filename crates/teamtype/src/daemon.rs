@@ -20,7 +20,6 @@ use automerge::{
     sync::{Message as AutomergeSyncMessage, State as SyncState},
 };
 use docstr::docstr;
-use futures::SinkExt;
 use rand::RngExt;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::{
@@ -105,7 +104,6 @@ pub(crate) enum DocMessage {
         response_tx: oneshot::Sender<Option<document::Content>>,
     },
     FromEditor(EditorId, IncomingMessage),
-    ToEditor(EditorId, OutgoingMessage),
     FromWatcher(WatcherEvent),
     RescanFiles,
     Persist,
@@ -129,7 +127,6 @@ impl Debug for DocMessage {
         let repr = match self {
             Self::GetContent { .. } => "GetContent".to_string(),
             Self::FromEditor(id, m) => format!("FromEditor({id}, {m:?})"),
-            Self::ToEditor(id, m) => format!("ToEditor({id}, {m:?})"),
             Self::FromWatcher(e) => format!("FromWatcher({e:?}"),
             Self::RescanFiles => "RescanFiles".to_string(),
             Self::Persist => "Persist".to_string(),
@@ -242,7 +239,7 @@ impl DocumentActor {
             .any(|connection| connection.0.owns(file_path))
     }
 
-    async fn handle_message(&mut self, message: DocMessage) {
+    fn handle_message(&mut self, message: DocMessage) {
         debug!("Handling doc message: {message:?}");
         match message {
             DocMessage::GetContent { response_tx } => {
@@ -259,13 +256,10 @@ impl DocumentActor {
                     file_path: RelativePath::new(TEST_FILE_PATH),
                     delta,
                 };
-                self.process_component_message(None, &message).await;
+                self.process_component_message(None, &message);
             }
             DocMessage::FromEditor(editor_id, message) => {
-                self.handle_message_from_editor(editor_id, message).await;
-            }
-            DocMessage::ToEditor(editor_id, message) => {
-                self.send_to_editor_client(&editor_id, message).await;
+                self.handle_message_from_editor(editor_id, message);
             }
             DocMessage::FromWatcher(watcher_event) => {
                 self.handle_watcher_event(&watcher_event);
@@ -380,7 +374,7 @@ impl DocumentActor {
                         file_path: file_text_delta.file_path.clone(),
                         delta: file_text_delta.delta.clone(),
                     };
-                    self.broadcast_to_editors(None, &message).await;
+                    self.broadcast_to_editors(None, &message);
                 }
 
                 if response_tx.send(peer_state).is_err() {
@@ -421,7 +415,7 @@ impl DocumentActor {
                         cursor_id: cursor_id.clone(),
                         cursor_state: ephemeral_message.cursor_state.clone(),
                     };
-                    self.send_to_editor(id, &message).await;
+                    self.send_to_editor(id, &message);
                 }
             }
             DocMessage::CloseEditorConnection(editor_id) => {
@@ -429,10 +423,10 @@ impl DocumentActor {
 
                 let cursor_id = self.cursor_id(editor_id);
                 debug!("Deleting cursor {cursor_id}.");
-                self.maybe_delete_cursor_position(&cursor_id).await;
+                self.maybe_delete_cursor_position(&cursor_id);
             }
             DocMessage::ReceiveEphemeral(ephemeral_message) => {
-                self.react_to_ephemeral_message(ephemeral_message).await;
+                self.react_to_ephemeral_message(ephemeral_message);
             }
         }
     }
@@ -442,7 +436,7 @@ impl DocumentActor {
     }
 
     // Returns the messages to send back to the editor which made the request.
-    async fn react_to_message_from_editor(
+    fn react_to_message_from_editor(
         &mut self,
         editor_id: EditorId,
         message: &EditorProtocolMessageFromEditor,
@@ -459,9 +453,8 @@ impl DocumentActor {
         // Then, forward them to the "core", and get back component messages that should be
         // returned to the editor (because, for example, it opened a file with a not up-to-date
         // content.)
-        let component_messages_to_editor = self
-            .process_component_message(Some(editor_id), &inside_message)
-            .await;
+        let component_messages_to_editor =
+            self.process_component_message(Some(editor_id), &inside_message);
 
         // And finally, send these component messages back to the editor connection (pass them
         // through the OT server), to retrieve raw messages for the editor.
@@ -478,44 +471,41 @@ impl DocumentActor {
         self.crdt_doc.actor_id() + "-" + editor_id.to_string().as_str()
     }
 
-    async fn handle_message_from_editor(&mut self, editor_id: EditorId, message: IncomingMessage) {
+    fn handle_message_from_editor(&mut self, editor_id: EditorId, message: IncomingMessage) {
         match message {
             IncomingMessage::Request { id, payload } => {
-                let result = self.react_to_message_from_editor(editor_id, &payload).await;
+                let result = self.react_to_message_from_editor(editor_id, &payload);
                 match result {
                     Err(error) => {
                         self.ui
                             .warn(&format!("Error for JSON-RPC request: {error:?}"));
                         self.send_to_editor_client(
-                            &editor_id,
+                            editor_id,
                             OutgoingMessage::Response(JSONRPCResponse::RequestError {
                                 id: Some(id),
                                 error,
                             }),
-                        )
-                        .await;
+                        );
                     }
                     Ok(messages) => {
                         self.send_to_editor_client(
-                            &editor_id,
+                            editor_id,
                             OutgoingMessage::Response(JSONRPCResponse::RequestSuccess {
                                 id,
                                 result: "success".into(),
                             }),
-                        )
-                        .await;
+                        );
                         for message in messages {
                             self.send_to_editor_client(
-                                &editor_id,
+                                editor_id,
                                 OutgoingMessage::Notification(message),
-                            )
-                            .await;
+                            );
                         }
                     }
                 }
             }
             IncomingMessage::Notification { payload } => {
-                let _ = self.react_to_message_from_editor(editor_id, &payload).await;
+                let _ = self.react_to_message_from_editor(editor_id, &payload);
             }
         }
     }
@@ -617,18 +607,20 @@ impl DocumentActor {
         delta
     }
 
-    async fn send_to_editor_client(&mut self, editor_id: &EditorId, message: OutgoingMessage) {
-        let connection = self
-            .editor_connections
-            .get_mut(editor_id)
-            .expect("Could not get editor handle");
+    /// Queue a message for an editor.
+    ///
+    /// This never blocks: the actual socket write is done by a dedicated task, so a slow editor
+    /// can not stall the document actor.
+    fn send_to_editor_client(&mut self, editor_id: EditorId, message: OutgoingMessage) {
+        let Some((_, writer)) = self.editor_connections.get(&editor_id) else {
+            return;
+        };
 
-        connection.1.send(message).await.unwrap_or_else(|err| {
-            self.ui.warn(&format!(
-                "Failed to send message to editor: {err} Removing editor."
-            ));
-            self.editor_connections.remove(editor_id);
-        });
+        if let Err(_message) = writer.send(message) {
+            self.ui
+                .warn("Failed to send message to editor. Removing editor.");
+            self.editor_connections.remove(&editor_id);
+        }
     }
 
     fn write_files_changed_in_file_deltas(&self, file_deltas: &[FileTextDelta]) {
@@ -755,7 +747,7 @@ impl DocumentActor {
     /// Called when a component message is sent "into the core".
     /// Returns the component messages to send back to the editor that sent the component message.
     /// `from_editor` must be `None` if the component message originates from the "CRDT component".
-    async fn process_component_message(
+    fn process_component_message(
         &mut self,
         from_editor: Option<EditorId>,
         message: &ComponentMessage,
@@ -823,24 +815,20 @@ impl DocumentActor {
             }
         }
 
-        self.broadcast_to_editors(from_editor, message).await;
+        self.broadcast_to_editors(from_editor, message);
 
         to_editor
     }
 
     // Send component message to all editors, excluding `exclude_id`.
-    async fn broadcast_to_editors(
-        &mut self,
-        exclude_id: Option<EditorId>,
-        message: &ComponentMessage,
-    ) {
+    fn broadcast_to_editors(&mut self, exclude_id: Option<EditorId>, message: &ComponentMessage) {
         let editor_ids: Vec<EditorId> = self.editor_connections.keys().copied().collect();
         for editor_id in editor_ids {
             if Some(editor_id) == exclude_id {
                 continue;
             }
 
-            self.send_to_editor(editor_id, message).await;
+            self.send_to_editor(editor_id, message);
         }
     }
 
@@ -866,19 +854,15 @@ impl DocumentActor {
         all_responses
     }
 
-    async fn send_to_editor(&mut self, editor_id: EditorId, message: &ComponentMessage) {
+    fn send_to_editor(&mut self, editor_id: EditorId, message: &ComponentMessage) {
         let messages_to_editor = self.process_in_editor(editor_id, vec![message.clone()]);
 
         for message_to_editor in messages_to_editor {
-            self.send_to_editor_client(
-                &editor_id,
-                OutgoingMessage::Notification(message_to_editor),
-            )
-            .await;
+            self.send_to_editor_client(editor_id, OutgoingMessage::Notification(message_to_editor));
         }
     }
 
-    async fn react_to_ephemeral_message(&mut self, new_ephemeral_message: EphemeralMessage) {
+    fn react_to_ephemeral_message(&mut self, new_ephemeral_message: EphemeralMessage) {
         let cursor_id = new_ephemeral_message.cursor_id.clone();
         let cursor_state = new_ephemeral_message.cursor_state.clone();
 
@@ -902,11 +886,10 @@ impl DocumentActor {
                 cursor_id,
                 cursor_state,
             },
-        )
-        .await;
+        );
     }
 
-    async fn maybe_delete_cursor_position(&mut self, cursor_id: &CursorId) {
+    fn maybe_delete_cursor_position(&mut self, cursor_id: &CursorId) {
         let message = ComponentMessage::Cursor {
             cursor_id: cursor_id.clone(),
             cursor_state: CursorState {
@@ -919,14 +902,14 @@ impl DocumentActor {
             },
         };
 
-        self.process_component_message(None, &message).await;
+        self.process_component_message(None, &message);
 
         self.ephemeral_states.remove(cursor_id);
     }
 
     async fn run(&mut self) {
         while let Some(message) = self.doc_message_rx.recv().await {
-            self.handle_message(message).await;
+            self.handle_message(message);
         }
         debug!("Channel towards document handle has been closed (probably shutting down).");
     }

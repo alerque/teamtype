@@ -7,7 +7,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+
 use e2e_tests::actors::{Actor, Neovim};
 use futures::future::join_all;
 use pretty_assertions::assert_eq;
@@ -22,9 +23,12 @@ use tempfile::tempdir;
 use tokio::time::{Duration, sleep, timeout};
 use tracing::{debug, info, warn};
 
-async fn perform_random_edits(actor: &mut (impl Actor + ?Sized)) {
-    for _ in 1..500 {
-        actor.apply_random_delta().await;
+async fn perform_random_edits(name: &str, actor: &mut (impl Actor + ?Sized)) {
+    for i in 1..500 {
+        // Bound each single edit, so that we learn *which* actor got stuck.
+        timeout(Duration::from_secs(60), actor.apply_random_delta())
+            .await
+            .unwrap_or_else(|_| panic!("{name} stopped responding while applying edit #{i}"));
 
         let random_millis = rand::rng().random_range(10..20);
         sleep(Duration::from_millis(random_millis)).await;
@@ -63,6 +67,38 @@ impl Interactions for FuzzerInteractions {
     }
 }
 
+/// How long we give each phase of the fuzzer before we consider it stuck.
+///
+/// Every wait in this test is bounded, so that a stall shows up as a loud failure with a
+/// diagnostic message instead of a CI job that hangs forever.
+const PHASE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+
+/// How long a single `content()` call may take.
+///
+/// A healthy actor answers in milliseconds, so this is a very generous bound. It exists so that a
+/// single stuck actor is reported *by name*, instead of taking the whole phase down with it.
+const CONTENT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// How long we let the daemons and editors keep retrying until their contents agree.
+const CONVERGENCE_TIMEOUT: Duration = Duration::from_secs(3 * 60);
+
+/// Read the content of every actor, bounding each read separately.
+///
+/// Reading them one by one (rather than as one group) means that a stuck actor is named in the
+/// error message, which is the single most useful thing to know when this test hangs.
+async fn collect_contents(
+    actors: &mut HashMap<String, Box<dyn Actor>>,
+) -> Result<HashMap<String, String>> {
+    let mut contents = HashMap::new();
+    for (name, actor) in actors.iter_mut() {
+        let content = timeout(CONTENT_TIMEOUT, actor.content())
+            .await
+            .with_context(|| format!("Timeout while reading the content of {name}"))?;
+        contents.insert(name.clone(), content);
+    }
+    Ok(contents)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let default_panic = std::panic::take_hook();
@@ -88,27 +124,39 @@ async fn main() -> Result<()> {
         base_dir: base_dir1,
         ..Default::default()
     };
+    ui.log("Starting the first daemon");
     let daemon1 = Daemon::new(config1, true, false, ui).await?;
 
     // Wait until iroh's DNS discovery (hopefully) works.
     sleep(Duration::from_millis(1000)).await;
 
-    let nvim1 = Neovim::new(Some(file1)).await;
+    ui.log("Starting the first Neovim");
+    let nvim1 = timeout(PHASE_TIMEOUT, Neovim::new(Some(file1)))
+        .await
+        .context("Timeout while starting the first Neovim")?;
 
     let config2 = Config {
         base_dir: base_dir2,
         peer: Some(Peer::SecretAddress(daemon1.secret_address().to_string())),
         ..Default::default()
     };
+    ui.log("Starting the second daemon");
     let daemon2 = Daemon::new(config2, false, false, ui).await?;
 
-    // Wait until file2 appears.
-    while !file2.exists() {
-        debug!("{file2:?} doesn't exist yet, sleeping");
-        sleep(Duration::from_millis(500)).await;
-    }
+    // Wait until file2 appears, i.e. until the two daemons have synced with each other.
+    timeout(PHASE_TIMEOUT, async {
+        while !file2.exists() {
+            debug!("{file2:?} doesn't exist yet, sleeping");
+            sleep(Duration::from_millis(500)).await;
+        }
+    })
+    .await
+    .context("Timeout while waiting for the two daemons to sync their initial file")?;
 
-    let nvim2 = Neovim::new(Some(file2)).await;
+    ui.log("Starting the second Neovim");
+    let nvim2 = timeout(PHASE_TIMEOUT, Neovim::new(Some(file2)))
+        .await
+        .context("Timeout while starting the second Neovim")?;
 
     // Give the second Neovim time to process the "open" call.
     sleep(Duration::from_millis(1000)).await;
@@ -123,45 +171,47 @@ async fn main() -> Result<()> {
 
     let handles = actors
         .iter_mut()
-        .map(|(_, actor)| perform_random_edits(actor.as_mut()));
-    join_all(handles).await;
-
-    let mut contents: HashMap<String, String> = HashMap::new();
+        .map(|(name, actor)| perform_random_edits(name, actor.as_mut()));
+    timeout(PHASE_TIMEOUT, join_all(handles))
+        .await
+        .context("Timeout while performing random edits")?;
 
     ui.log("Waiting for all contents to be equal");
 
-    timeout(Duration::from_secs(5 * 60), async {
+    // If the actors don't agree in time, we don't give up here: we carry on to the final read
+    // below. That read is bounded per actor, so it names whichever actor is stuck, and the
+    // comparison afterwards prints the differing contents. Failing here instead would swallow
+    // the most useful part of the diagnosis.
+    let converged = timeout(CONVERGENCE_TIMEOUT, async {
         loop {
-            // Get all contents.
-            for (name, actor) in &mut actors {
-                let content = actor.content().await;
-                contents.insert(name.clone(), content.clone());
-            }
+            let contents = collect_contents(&mut actors).await?;
 
             // If all contents are equal already, we have succeeded!
             let first = contents.values().next().expect("No contents found");
-            let mut all_equal = true;
-            for content in contents.values() {
-                if first != content {
-                    all_equal = false;
-                }
-            }
-            if all_equal {
+            if contents.values().all(|content| content == first) {
                 break;
             }
             sleep(Duration::from_millis(1000)).await;
         }
+        Ok::<_, anyhow::Error>(())
     })
-    .await
-    .unwrap_or_else(|_| {
-        ui.warn("Timeout while waiting for all contents to be equal");
-    });
+    .await;
 
-    // Get all contents.
-    for (name, actor) in &mut actors {
-        let content = actor.content().await;
-        contents.insert(name.clone(), content.clone());
+    match converged {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => ui.warn(&format!(
+            "Failed to read all contents while waiting for convergence: {error:#}"
+        )),
+        Err(_) => ui.warn(&format!(
+            "Timeout after {CONVERGENCE_TIMEOUT:?} while waiting for all contents to be equal"
+        )),
     }
+
+    // Get all contents. Every read is bounded separately, so that a stuck actor fails the test
+    // with a message naming it, instead of hanging.
+    let contents = collect_contents(&mut actors)
+        .await
+        .context("Timeout while getting the final contents of all actors")?;
 
     // Print all contents.
     for (name, content) in &contents {
