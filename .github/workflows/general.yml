@@ -6,8 +6,6 @@ name: General tests
 
 on:
   push:
-    branches:
-      - main
   pull_request:
 
 env:
