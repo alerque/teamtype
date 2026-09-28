@@ -55,19 +55,9 @@ jobs:
         run: cargo test --locked --no-default-features -p e2e-tests
       - if: ${{ matrix.nvim-version == 'v0.12.4' }}
         name: Run e2e fuzzer
-        # The fuzzer installs its own panic hook and a logging subscriber, and the test target
-        # has `harness = false`, so nothing is captured unless we ask for it. Without a log
-        # level, a failing run produces no output at all, which makes debugging it a guessing
-        # game.
-        #
-        # The timeout here is only a backstop against a hard hang. The test bounds every one of
-        # its own waits, so a stall should surface as a failure naming the stuck actor. This
-        # needs to sit comfortably above the sum of those in-test bounds (four 5-minute phases
-        # plus a 3-minute convergence phase, ~24 minutes worst case), otherwise the job gets
-        # cancelled before the test's own diagnostic has a chance to print.
         env:
           RUST_LOG: teamtype=debug
-        timeout-minutes: 30
+        timeout-minutes: 15
         run: cargo test --locked --no-default-features -p e2e-tests --test fuzzer
 
   check_formatting:
