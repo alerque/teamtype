@@ -6,8 +6,6 @@ name: General tests
 
 on:
   push:
-    branches:
-      - main
   pull_request:
 
 env:
@@ -22,13 +20,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         nvim-version: [v0.12.5]
-        include:
-          - os: ubuntu-latest
-            nvim-version: v0.9.5
-          - os: ubuntu-latest
-            nvim-version: v0.10.4
-          - os: ubuntu-latest
-            nvim-version: v0.11.7
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -72,7 +63,7 @@ jobs:
           RUST_LOG: teamtype=debug
         timeout-minutes: 15
         run: cargo test --locked --no-default-features -p e2e-tests --test fuzzer
-      - if: ${{ matrix.nvim-version == 'v0.12.2' }}
+      - if: ${{ matrix.nvim-version == 'v0.12.5' }}
         name: Upload test artifact
         uses: actions/upload-artifact@v7
         with:

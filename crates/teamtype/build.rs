@@ -29,8 +29,8 @@ fn main() -> Result<()> {
         output_completions(version)?;
         output_manpages(version)?;
     }
-    #[cfg(all(windows, target_env = "msvc"))]
-    static_vcruntime::metabuild();
+    // #[cfg(all(windows, target_env = "msvc"))]
+    // static_vcruntime::metabuild();
     Ok(())
 }
 
